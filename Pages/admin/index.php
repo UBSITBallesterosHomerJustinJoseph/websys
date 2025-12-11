@@ -109,6 +109,33 @@ if (isset($_GET['verify_farmer'])) {
     }
 }
 
+// Handle user deletion
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_user'])) {
+    $user_id_to_delete = (int)$_POST['user_id_to_delete'];
+    
+    // Prevent self-deletion
+    if ($user_id_to_delete == $admin_id) {
+        $_SESSION['error'] = 'You cannot delete your own account.';
+        header("Location: index.php?tab=users");
+        exit();
+    }
+    
+    // Delete user (cascade will handle related records)
+    $delete_stmt = $farmcart->conn->prepare("DELETE FROM users WHERE user_id = ?");
+    if ($delete_stmt) {
+        $delete_stmt->bind_param("i", $user_id_to_delete);
+        if ($delete_stmt->execute()) {
+            $_SESSION['success'] = 'User deleted successfully.';
+        } else {
+            $_SESSION['error'] = 'Failed to delete user: ' . $delete_stmt->error;
+        }
+        $delete_stmt->close();
+    }
+    
+    header("Location: index.php?tab=users");
+    exit();
+}
+
 // Handle category creation
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_category'])) {
     $category_name = $farmcart->conn->real_escape_string($_POST['category_name']);

@@ -2,67 +2,134 @@
 session_start();
 include '../../db_connect.php';
 
-// Check if user is logged in
-if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
-    // Return JSON response for AJAX requests
-    header('Content-Type: application/json');
-    echo json_encode([
-        'success' => false,
-        'message' => 'Please log in to add products to cart.',
-        'redirect' => '/websys/Register/login.php?redirect=' . urlencode($_SERVER['HTTP_REFERER'] ?? '/websys/Pages/customer/products.php')
-    ]);
-    exit();
-}
+header('Content-Type: application/json');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $userId = $_SESSION['user_id'];
     $productId = $_POST['product_id'] ?? null;
-    $quantity = $_POST['quantity'] ?? 1;
+    $quantity = isset($_POST['quantity']) ? (int)$_POST['quantity'] : 1;
 
     // Validate the inputs
     if ($productId && is_numeric($quantity) && $quantity > 0) {
-        // Check if product exists and is available
-        $check_product = $farmcart->conn->prepare("SELECT product_id, base_price FROM products WHERE product_id = ? AND approval_status = 'approved' AND is_listed = 1 AND (is_expired IS NULL OR is_expired = 0)");
-        $check_product->bind_param("i", $productId);
-        $check_product->execute();
-        $product_result = $check_product->get_result();
+        // Verify product exists and is available
+        $checkProduct = $farmcart->conn->prepare("SELECT product_id, base_price FROM products WHERE product_id = ? AND approval_status = 'approved' AND is_listed = TRUE AND (is_expired IS NULL OR is_expired = 0)");
+        $checkProduct->bind_param("i", $productId);
+        $checkProduct->execute();
+        $productResult = $checkProduct->get_result();
         
-        if ($product_result->num_rows === 0) {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'message' => 'Product not available.']);
-            exit();
+        if ($productResult->num_rows === 0) {
+            echo json_encode(['success' => false, 'message' => 'Product not found or not available.']);
+            exit;
         }
         
-        // Check if product already in cart
-        $sql = "SELECT * FROM carts WHERE user_id = ? AND product_id = ?";
-        $stmt = $farmcart->conn->prepare($sql);
-        $stmt->bind_param("ii", $userId, $productId);
-        $stmt->execute();
-        $result = $stmt->get_result();
+        $product = $productResult->fetch_assoc();
+        $checkProduct->close();
+        
+        // Check available quantity from products table
+        $checkQuantity = $farmcart->conn->prepare("SELECT quantity FROM products WHERE product_id = ?");
+        $checkQuantity->bind_param("i", $productId);
+        $checkQuantity->execute();
+        $quantityResult = $checkQuantity->get_result();
+        $quantityData = $quantityResult->fetch_assoc();
+        $totalAvailable = (int)($quantityData['quantity'] ?? 0);
+        $checkQuantity->close();
+        
+        // If user is logged in, associate the cart with the user
+        if ($userId) {
+            // Check if carts table exists, if not create it
+            $checkTable = $farmcart->conn->query("SHOW TABLES LIKE 'carts'");
+            if ($checkTable->num_rows === 0) {
+                $createTable = "CREATE TABLE IF NOT EXISTS carts (
+                    cart_id INT AUTO_INCREMENT PRIMARY KEY,
+                    user_id INT NOT NULL,
+                    product_id INT NOT NULL,
+                    quantity INT NOT NULL DEFAULT 1,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE KEY unique_user_product (user_id, product_id),
+                    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+                    FOREIGN KEY (product_id) REFERENCES products(product_id) ON DELETE CASCADE
+                )";
+                $farmcart->conn->query($createTable);
+            }
+            
+            $sql = "SELECT * FROM carts WHERE user_id = ? AND product_id = ?";
+            $stmt = $farmcart->conn->prepare($sql);
+            $stmt->bind_param("ii", $userId, $productId);
+            $stmt->execute();
+            $result = $stmt->get_result();
 
-        if ($result->num_rows > 0) {
-            // If product already in cart, update quantity
-            $sql = "UPDATE carts SET quantity = quantity + ? WHERE user_id = ? AND product_id = ?";
-            $stmt = $farmcart->conn->prepare($sql);
-            $stmt->bind_param("iii", $quantity, $userId, $productId);
-            $stmt->execute();
-            header('Content-Type: application/json');
-            echo json_encode(['success' => true, 'message' => 'Product quantity updated in your cart.']);
+            if ($result->num_rows > 0) {
+                // Get current cart quantity
+                $cartItem = $result->fetch_assoc();
+                $currentCartQty = $cartItem['quantity'];
+                $newTotalQty = $currentCartQty + $quantity;
+                
+                // Check if new total exceeds available quantity
+                if ($newTotalQty > $totalAvailable) {
+                    echo json_encode(['success' => false, 'message' => "Cannot add more. Only {$totalAvailable} available. You already have {$currentCartQty} in cart."]);
+                    $stmt->close();
+                    exit;
+                }
+                
+                // If product already in cart, update quantity
+                $sql = "UPDATE carts SET quantity = quantity + ? WHERE user_id = ? AND product_id = ?";
+                $stmt = $farmcart->conn->prepare($sql);
+                $stmt->bind_param("iii", $quantity, $userId, $productId);
+                if ($stmt->execute()) {
+                    echo json_encode(['success' => true, 'message' => 'Product quantity updated in your cart.']);
+                } else {
+                    echo json_encode(['success' => false, 'message' => 'Failed to update cart.']);
+                }
+            } else {
+                // Check if quantity exceeds available
+                if ($quantity > $totalAvailable) {
+                    echo json_encode(['success' => false, 'message' => "Cannot add. Only {$totalAvailable} available."]);
+                    exit;
+                }
+                
+                // Add new product to cart
+                $sql = "INSERT INTO carts (user_id, product_id, quantity) VALUES (?, ?, ?)";
+                $stmt = $farmcart->conn->prepare($sql);
+                $stmt->bind_param("iii", $userId, $productId, $quantity);
+                if ($stmt->execute()) {
+                    echo json_encode(['success' => true, 'message' => 'Product added to your cart.']);
+                } else {
+                    echo json_encode(['success' => false, 'message' => 'Failed to add product to cart.']);
+                }
+            }
+            $stmt->close();
         } else {
-            // Add new product to cart
-            $sql = "INSERT INTO carts (user_id, product_id, quantity) VALUES (?, ?, ?)";
-            $stmt = $farmcart->conn->prepare($sql);
-            $stmt->bind_param("iii", $userId, $productId, $quantity);
-            $stmt->execute();
-            header('Content-Type: application/json');
-            echo json_encode(['success' => true, 'message' => 'Product added to your cart.']);
+            // Handle case where user is not logged in
+            if (!isset($_SESSION['guest_cart'])) {
+                $_SESSION['guest_cart'] = [];
+            }
+            // Check available quantity for guest
+            if ($quantity > $totalAvailable) {
+                echo json_encode(['success' => false, 'message' => "Cannot add. Only {$totalAvailable} available."]);
+                exit;
+            }
+            
+            if (!isset($_SESSION['guest_cart'][$productId])) {
+                $_SESSION['guest_cart'][$productId] = [
+                    'product_id' => $productId,
+                    'quantity' => 0,
+                    'base_price' => $product['base_price']
+                ];
+            }
+            
+            $newGuestQty = $_SESSION['guest_cart'][$productId]['quantity'] + $quantity;
+            if ($newGuestQty > $totalAvailable) {
+                echo json_encode(['success' => false, 'message' => "Cannot add more. Only {$totalAvailable} available. You already have {$_SESSION['guest_cart'][$productId]['quantity']} in cart."]);
+                exit;
+            }
+            
+            $_SESSION['guest_cart'][$productId]['quantity'] += $quantity;
+            echo json_encode(['success' => true, 'message' => 'Product added to your cart (Guest).']);
         }
     } else {
-        header('Content-Type: application/json');
         echo json_encode(['success' => false, 'message' => 'Invalid product or quantity.']);
     }
 } else {
-    header('Content-Type: application/json');
-    echo json_encode(['success' => false, 'message' => 'Invalid request.']);
+    echo json_encode(['success' => false, 'message' => 'Invalid request method.']);
 }
 ?>

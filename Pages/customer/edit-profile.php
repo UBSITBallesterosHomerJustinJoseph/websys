@@ -20,13 +20,26 @@ $is_customer_without_farm = ($user_role === 'customer' && !$has_farm_profile);
 $can_edit_farm_info = ($user_role === 'farmer' || $user_role === 'admin' || $has_farm_profile);
 
 $message = '';
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+$passwordMessage = '';
+
+// Handle profile update
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
     $userData = [
         'email'        => $_POST['email'],
         'first_name'   => $_POST['first_name'],
         'last_name'    => $_POST['last_name'],
         'phone_number' => $_POST['phone_number'],
         'address'      => $_POST['address']
+    ];
+
+    $farmData = [
+        'farm_name'            => $_POST['farm_name'] ?? '',
+        'farm_location'        => $_POST['farm_location'] ?? '',
+        'farm_size'            => $_POST['farm_size'] ?? '',
+        'farming_method'       => $_POST['farming_method'] ?? '',
+        'years_experience'     => $_POST['years_experience'] ?? '',
+        'certification_details'=> $_POST['certification_details'] ?? '',
+        'bio'                  => $_POST['bio'] ?? ''
     ];
 
     $userUpdated = $userObj->updateUser($userId, $userData);
@@ -55,6 +68,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $can_edit_farm_info = ($user_role === 'farmer' || $user_role === 'admin' || $has_farm_profile);
     } else {
         $message = "❌ Error updating profile.";
+    }
+}
+
+// Handle password change
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
+    $currentPassword = $_POST['current_password'] ?? '';
+    $newPassword = $_POST['new_password'] ?? '';
+    $confirmPassword = $_POST['confirm_password'] ?? '';
+    
+    if (empty($currentPassword) || empty($newPassword) || empty($confirmPassword)) {
+        $passwordMessage = "❌ All password fields are required.";
+    } elseif ($newPassword !== $confirmPassword) {
+        $passwordMessage = "❌ New passwords do not match.";
+    } elseif (strlen($newPassword) < 6) {
+        $passwordMessage = "❌ New password must be at least 6 characters long.";
+    } else {
+        // Verify current password
+        $checkPassword = $farmcart->conn->prepare("SELECT password FROM users WHERE user_id = ?");
+        $checkPassword->bind_param("i", $userId);
+        $checkPassword->execute();
+        $passwordResult = $checkPassword->get_result();
+        
+        if ($passwordResult->num_rows > 0) {
+            $userData = $passwordResult->fetch_assoc();
+            if (password_verify($currentPassword, $userData['password'])) {
+                // Update password
+                $hashedPassword = password_hash($newPassword, PASSWORD_DEFAULT);
+                $updatePassword = $farmcart->conn->prepare("UPDATE users SET password = ? WHERE user_id = ?");
+                $updatePassword->bind_param("si", $hashedPassword, $userId);
+                
+                if ($updatePassword->execute()) {
+                    $passwordMessage = "✅ Password changed successfully!";
+                } else {
+                    $passwordMessage = "❌ Error changing password.";
+                }
+                $updatePassword->close();
+            } else {
+                $passwordMessage = "❌ Current password is incorrect.";
+            }
+        }
+        $checkPassword->close();
     }
 }
 ?>
@@ -464,20 +518,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           </div>
         <?php endif; ?>
 
-        <form method="post">
-          <!-- User Info Section -->
-          <div class="form-section-title">
-            <i class="fas fa-user"></i>
-            <span>Personal Information</span>
-          </div>
-
-          <div class="row">
-            <div class="col-md-6">
-              <label class="form-label">Email</label>
-              <input type="email" name="email" class="form-control" 
-                     value="<?php echo htmlspecialchars($user['email'] ?? ''); ?>" required>
-              <div class="form-text">Enter a valid email address for login and notifications.</div>
-            </div>
+      <form method="post">
+        <input type="hidden" name="update_profile" value="1">
+        <div class="row g-3">
+        <!-- User Info -->
+        <div class="col-12">
+          <h5 class="fw-bold text-success mb-3"><i class="fas fa-user me-2"></i>Personal Information</h5>
+        </div>
+<div class="col-md-6">
+  <label class="form-label">Email</label>
+  <input type="email" name="email" class="form-control" 
+         value="<?php echo htmlspecialchars($user['email'] ?? ''); ?>" required>
+  <div class="form-text">Enter a valid email address for login and notifications.</div>
+</div>
 
             <div class="col-md-6">
               <label class="form-label">Phone Number</label>
@@ -512,27 +565,59 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
           </div>
 
-          <hr>
+        </div>
 
-          <!-- Farm Info Section -->
-          <div class="form-section-title">
-            <i class="fas fa-seedling"></i>
-            <span>Farm Information</span>
+        <hr class="my-4">
+
+        <!-- Change Password Section -->
+        <div class="row g-3">
+          <div class="col-12">
+            <h5 class="fw-bold text-success mb-3"><i class="fas fa-key me-2"></i>Change Password</h5>
           </div>
           
-          <?php if ($is_customer_without_farm): ?>
-            <div class="alert alert-warning mb-4">
-              <i class="fas fa-info-circle"></i>
-              <strong>Store Account Required</strong><br>
-              <small>To edit farm information, you must first set up a store account. 
-              <a href="setUpStore.php" class="btn-setup-store mt-3">
-                <i class="fas fa-store me-2"></i>Set Up Store Account
-              </a></small>
+          <?php if ($passwordMessage): ?>
+            <div class="col-12">
+              <div class="alert alert-<?= strpos($passwordMessage, '✅') !== false ? 'success' : 'danger'; ?>">
+                <?php echo htmlspecialchars($passwordMessage); ?>
+              </div>
             </div>
-            <div class="farm-section-disabled">
           <?php endif; ?>
+          
+          <div class="col-md-4">
+            <label class="form-label">Current Password</label>
+            <input type="password" name="current_password" class="form-control" 
+                   placeholder="Enter current password">
+          </div>
+          
+          <div class="col-md-4">
+            <label class="form-label">New Password</label>
+            <input type="password" name="new_password" class="form-control" 
+                   placeholder="Enter new password" minlength="6">
+            <div class="form-text">Minimum 6 characters</div>
+          </div>
+          
+          <div class="col-md-4">
+            <label class="form-label">Confirm New Password</label>
+            <input type="password" name="confirm_password" class="form-control" 
+                   placeholder="Confirm new password" minlength="6">
+          </div>
+          
+          <div class="col-12">
+            <button type="submit" name="change_password" class="btn btn-warning">
+              <i class="fas fa-key me-2"></i>Change Password
+            </button>
+          </div>
+        </div>
 
+        <hr class="my-4">
+
+        <!-- Farm Info (only show if user is a farmer) -->
+        <?php if (isset($_SESSION['user_role']) && $_SESSION['user_role'] === 'farmer'): ?>
+        <div class="row g-3">
+        <div class="col-12">
+          <h5 class="fw-bold text-success mb-3"><i class="fas fa-seedling me-2"></i>Farm Information</h5>
           <p class="text-muted mb-4">This section helps customers understand your farming practices.</p>
+        </div>
 
           <div class="row">
             <div class="col-md-6">
@@ -593,32 +678,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
           </div>
 
-          <div class="row">
-            <div class="col-12">
-              <label class="form-label">Bio</label>
-              <textarea name="bio" class="form-control" rows="4" 
-                        <?php echo $can_edit_farm_info ? 'required' : 'disabled'; ?>><?php echo htmlspecialchars($user['bio'] ?? ''); ?></textarea>
-              <div class="form-text">Tell us about your farm, values, and story.</div>
-            </div>
-          </div>
+<div class="col-12">
+  <label class="form-label">Bio</label>
+  <textarea name="bio" class="form-control" rows="3"><?php echo htmlspecialchars($user['bio'] ?? ''); ?></textarea>
+  <div class="form-text">Tell us about your farm, values, and story.</div>
+</div>
+        </div>
+        <?php endif; ?>
 
-          <?php if ($is_customer_without_farm): ?>
-            </div>
-          <?php endif; ?>
+        <hr class="my-4">
 
-          <!-- Submit Buttons -->
-          <div class="row mt-4">
-            <div class="col-12 d-flex gap-3 justify-content-end flex-wrap">
-              <a href="profile.php" class="btn btn-cancel">
-                <i class="fas fa-times me-2"></i>Cancel
-              </a>
-              <button type="submit" class="btn btn-submit">
-                <i class="fas fa-save me-2"></i>Save Changes
-              </button>
-            </div>
-          </div>
-        </form>
-      </div>
+        <!-- Submit Button -->
+        <div class="d-flex gap-3">
+          <button type="submit" class="btn btn-success btn-lg">
+            <i class="fas fa-save me-2"></i>Save Profile Changes
+          </button>
+          <a href="profile.php" class="btn btn-outline-secondary btn-lg">
+            <i class="fas fa-times me-2"></i>Cancel
+          </a>
+        </div>
+      </form>
     </div>
   </div>
 </body>

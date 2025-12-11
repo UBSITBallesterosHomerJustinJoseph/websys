@@ -45,7 +45,7 @@ $category_descriptions = [
 $display_name = $category_display_names[$category_name] ?? ($category_display_names[$category_type] ?? ucfirst($category_name));
 $description = $category_descriptions[$category_name] ?? ($category_descriptions[$category_type] ?? 'Discover our fresh farm products.');
 
-// Fetch approved products from database
+// Fetch approved products from database with quantity
 $products_query = "SELECT
                     p.product_id,
                     p.product_name,
@@ -53,6 +53,7 @@ $products_query = "SELECT
                     p.category_id,
                     p.unit_type,
                     p.base_price,
+                    p.quantity,
                     p.expires_at,
                     p.approval_status,
                     p.created_at,
@@ -253,6 +254,10 @@ if ($products_result) {
                                     <p class="text-muted small mb-2">
                                         <i class="fas fa-weight me-1"></i>Per <?= htmlspecialchars($product['unit_type']); ?>
                                     </p>
+                                    <p class="text-info small mb-2">
+                                        <i class="fas fa-box me-1"></i>
+                                        Available: <?= number_format($product['quantity'] ?? 0, 0); ?> <?= htmlspecialchars($product['unit_type']); ?>
+                                    </p>
 
                                     <p class="small mb-2 text-truncate-3">
                                         <?= nl2br(htmlspecialchars(substr($product['description'], 0, 150))); ?>
@@ -291,8 +296,11 @@ if ($products_result) {
                                                 <i class="fas fa-eye me-1"></i>View Image
                                             </button>
                                         <?php endif; ?>
-                                        <button class="btn btn-sm btn-success" onclick="addToCart(<?= $product['product_id'] ?>)">
-                                            <i class="fas fa-cart-plus me-1"></i>Add to Cart
+                                        <button class="btn btn-sm btn-success" 
+                                                onclick="addToCart(<?= $product['product_id'] ?>, <?= (int)($product['quantity'] ?? 0) ?>, event)"
+                                                <?= ($product['quantity'] ?? 0) <= 0 ? 'disabled title="Out of stock"' : '' ?>>
+                                            <i class="fas fa-cart-plus me-1"></i>
+                                            <?= ($product['quantity'] ?? 0) <= 0 ? 'Out of Stock' : 'Add to Cart' ?>
                                         </button>
                                     </div>
                                 </div>
@@ -443,44 +451,88 @@ if ($products_result) {
         }
 
         // Add to Cart Function
-        function addToCart(productId) {
-            <?php if (!$is_logged_in): ?>
-                // User is not logged in, redirect to login page
-                const returnUrl = encodeURIComponent(window.location.href);
-                window.location.href = '/websys/Register/login.php?redirect=' + returnUrl;
-                return;
-            <?php endif; ?>
-            
-            // User is logged in, proceed with adding to cart
-            const quantity = prompt('Enter quantity:', '1');
-            if (quantity && !isNaN(quantity) && parseInt(quantity) > 0) {
-                // Send AJAX request to add to cart
-                fetch('/websys/Pages/customer/add_to_cart.php', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
-                    body: 'product_id=' + productId + '&quantity=' + quantity
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        alert(data.message || 'Product added to cart!');
-                        // Optionally refresh the page or update cart count
-                        console.log('Added product ' + productId + ' to cart');
-                    } else {
-                        if (data.redirect) {
-                            window.location.href = data.redirect;
-                        } else {
-                            alert(data.message || 'Error adding product to cart.');
-                        }
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('Error adding product to cart. Please try again.');
-                });
+        function addToCart(productId, availableQuantity, evt) {
+            // Get the button that was clicked
+            const btn = evt ? evt.target.closest('button') : (window.event ? window.event.target.closest('button') : null);
+            if (!btn) {
+                // Fallback: find button by product ID
+                const buttons = document.querySelectorAll(`button[onclick*="addToCart(${productId}"]`);
+                if (buttons.length > 0) {
+                    btn = buttons[buttons.length - 1];
+                } else {
+                    console.error('Could not find button');
+                    return;
+                }
             }
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Adding...';
+            
+            // Check available quantity
+            if (availableQuantity <= 0) {
+                alert('This product is currently out of stock.');
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+                return;
+            }
+
+            // Send AJAX request
+            const formData = new FormData();
+            formData.append('product_id', productId);
+            formData.append('quantity', 1);
+            formData.append('available_quantity', availableQuantity);
+            
+            fetch('add_to_cart.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Show success message
+                    btn.innerHTML = '<i class="fas fa-check me-1"></i>Added!';
+                    btn.classList.remove('btn-success');
+                    btn.classList.add('btn-outline-success');
+                    
+                    // Show toast notification
+                    showToast(data.message, 'success');
+                    
+                    // Reset button after 2 seconds
+                    setTimeout(() => {
+                        btn.innerHTML = originalText;
+                        btn.classList.remove('btn-outline-success');
+                        btn.classList.add('btn-success');
+                        btn.disabled = false;
+                    }, 2000);
+                } else {
+                    alert(data.message || 'Failed to add product to cart.');
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred. Please try again.');
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            });
+        }
+        
+        // Toast notification function
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            toast.className = `alert alert-${type === 'success' ? 'success' : 'danger'} alert-dismissible fade show position-fixed`;
+            toast.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+            toast.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.body.appendChild(toast);
+            
+            // Auto remove after 3 seconds
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
         }
 
         // Product Details Modal
