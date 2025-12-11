@@ -12,6 +12,24 @@ $farmer_id = $_SESSION['user_id'];
 $farmer_name = $_SESSION['first_name'] . ' ' . $_SESSION['last_name'];
 $farmer_profile = $farmcart->get_farmer_profile($farmer_id);
 
+// Ensure expiration columns exist (safe inline migration)
+function ensure_product_expiration_columns($conn) {
+    $columns = [
+        'expiration_duration_seconds' => "INT NULL DEFAULT NULL",
+        'expires_at' => "DATETIME NULL DEFAULT NULL",
+        'is_expired' => "TINYINT(1) NOT NULL DEFAULT 0",
+        'approved_at' => "DATETIME NULL DEFAULT NULL"
+    ];
+
+    foreach ($columns as $name => $definition) {
+        $check = $conn->query("SHOW COLUMNS FROM products LIKE '{$name}'");
+        if ($check && $check->num_rows === 0) {
+            $conn->query("ALTER TABLE products ADD COLUMN {$name} {$definition}");
+        }
+    }
+}
+ensure_product_expiration_columns($farmcart->conn);
+
 // Calculate counts for sidebar badges
 $total_products_count = 0;
 $count_query = "SELECT COUNT(*) AS total FROM products WHERE created_by = ?";
@@ -39,18 +57,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_product'])) {
     $description = $farmcart->conn->real_escape_string($_POST['description']);
     $unit_type = $farmcart->conn->real_escape_string($_POST['unit_type']);
     $base_price = floatval($_POST['base_price']);
+    $exp_months = isset($_POST['exp_months']) ? max(0, (int)$_POST['exp_months']) : 0;
+    $exp_days = isset($_POST['exp_days']) ? max(0, (int)$_POST['exp_days']) : 0;
+    $exp_hours = isset($_POST['exp_hours']) ? max(0, (int)$_POST['exp_hours']) : 0;
+    $exp_seconds = isset($_POST['exp_seconds']) ? max(0, (int)$_POST['exp_seconds']) : 0;
+    $expiration_duration_seconds = (($exp_months * 30 + $exp_days) * 24 * 3600) + ($exp_hours * 3600) + $exp_seconds;
+    $has_image = isset($_FILES['image']) && $_FILES['image']['error'] === 0 && !empty($_FILES['image']['name']);
 
     // Validate required fields
     if (empty($product_name) || empty($category_id) || empty($unit_type) || $base_price <= 0) {
         $error = "Please fill in all required fields with valid values.";
+    } elseif ($expiration_duration_seconds <= 0) {
+        $error = "Please provide an expiration duration greater than zero.";
+    } elseif (!$has_image) {
+        $error = "Product image is required.";
     } else {
         // Insert product with pending approval status and not listed
-        $sql = "INSERT INTO products (product_name, description, category_id, unit_type, base_price, created_by, approval_status, is_active, is_listed)
-                VALUES (?, ?, ?, ?, ?, ?, 'pending', TRUE, FALSE)";
+        $sql = "INSERT INTO products (product_name, description, category_id, unit_type, base_price, created_by, approval_status, is_active, is_listed, expiration_duration_seconds, is_expired)
+                VALUES (?, ?, ?, ?, ?, ?, 'pending', TRUE, FALSE, ?, 0)";
         $stmt = $farmcart->conn->prepare($sql);
 
         if ($stmt) {
-            $stmt->bind_param("ssisdi", $product_name, $description, $category_id, $unit_type, $base_price, $farmer_id);
+            $stmt->bind_param("ssisdii", $product_name, $description, $category_id, $unit_type, $base_price, $farmer_id, $expiration_duration_seconds);
 
             if ($stmt->execute()) {
                 $product_id = $stmt->insert_id;
@@ -293,6 +321,37 @@ function sendAdminNotification($product_id, $product_name, $farmer_id, $farmer_n
                   </div>
 
                   <div class="col-12">
+                    <label class="form-label fw-semibold required-field">Expiration Duration</label>
+                    <div class="row g-2">
+                      <div class="col-6 col-md-3">
+                        <div class="input-group input-group-sm">
+                          <span class="input-group-text">Months</span>
+                          <input type="number" name="exp_months" min="0" class="form-control" value="<?= isset($_POST['exp_months']) ? (int)$_POST['exp_months'] : 0 ?>">
+                        </div>
+                      </div>
+                      <div class="col-6 col-md-3">
+                        <div class="input-group input-group-sm">
+                          <span class="input-group-text">Days</span>
+                          <input type="number" name="exp_days" min="0" class="form-control" value="<?= isset($_POST['exp_days']) ? (int)$_POST['exp_days'] : 0 ?>">
+                        </div>
+                      </div>
+                      <div class="col-6 col-md-3">
+                        <div class="input-group input-group-sm">
+                          <span class="input-group-text">Hours</span>
+                          <input type="number" name="exp_hours" min="0" class="form-control" value="<?= isset($_POST['exp_hours']) ? (int)$_POST['exp_hours'] : 0 ?>">
+                        </div>
+                      </div>
+                      <div class="col-6 col-md-3">
+                        <div class="input-group input-group-sm">
+                          <span class="input-group-text">Seconds</span>
+                          <input type="number" name="exp_seconds" min="0" class="form-control" value="<?= isset($_POST['exp_seconds']) ? (int)$_POST['exp_seconds'] : 0 ?>">
+                        </div>
+                      </div>
+                    </div>
+                    <div class="form-text">Product will expire after admin approval using this duration (months counted as 30 days).</div>
+                  </div>
+
+                  <div class="col-12">
                     <label class="form-label fw-semibold required-field">Product Description</label>
                     <textarea name="description" class="form-control" rows="5" 
                               placeholder="Describe your product in detail (quality, farming methods, storage instructions, etc.)..." 
@@ -310,11 +369,11 @@ function sendAdminNotification($product_id, $product_name, $farmer_id, $farmer_n
                   <div class="mb-3">
                     <img id="imagePreview" src="https://via.placeholder.com/200x200?text=Product+Image" class="preview-image" alt="Preview">
                   </div>
-                  <input type="file" name="image" class="form-control" accept="image/*" onchange="previewImage(this)">
+                  <input type="file" name="image" class="form-control" accept="image/*" onchange="previewImage(this)" required>
                   <div class="form-text">
                     Supported formats: JPG, JPEG, PNG, GIF<br>
                     Max size: 5MB<br>
-                    <span class="text-muted">Optional but recommended</span>
+                    <span class="text-muted">Required</span>
                   </div>
                 </div>
 

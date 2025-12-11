@@ -12,6 +12,24 @@ $farmer_id = $_SESSION['user_id'];
 $farmer_name = $_SESSION['first_name'] . ' ' . $_SESSION['last_name'];
 $farmer_profile = $farmcart->get_farmer_profile($farmer_id);
 
+// Ensure expiration columns exist and mark expired products
+function ensure_product_expiration_columns($conn) {
+    $columns = [
+        'expiration_duration_seconds' => "INT NULL DEFAULT NULL",
+        'expires_at' => "DATETIME NULL DEFAULT NULL",
+        'is_expired' => "TINYINT(1) NOT NULL DEFAULT 0",
+        'approved_at' => "DATETIME NULL DEFAULT NULL"
+    ];
+    foreach ($columns as $name => $definition) {
+        $check = $conn->query("SHOW COLUMNS FROM products LIKE '{$name}'");
+        if ($check && $check->num_rows === 0) {
+            $conn->query("ALTER TABLE products ADD COLUMN {$name} {$definition}");
+        }
+    }
+}
+ensure_product_expiration_columns($farmcart->conn);
+$farmcart->conn->query("UPDATE products SET is_expired = 1, is_listed = 0 WHERE (is_expired IS NULL OR is_expired = 0) AND expires_at IS NOT NULL AND expires_at <= NOW()");
+
 // Calculate total products count for sidebar
 $count_query = "SELECT COUNT(*) as total FROM products WHERE created_by = ?";
 $count_stmt = $farmcart->conn->prepare($count_query);
@@ -67,17 +85,31 @@ if (isset($_GET['delete']) && $_GET['delete'] > 0) {
 }
 
 // Fetch farmer's products with approval status
+$status_filter = isset($_GET['status']) ? $_GET['status'] : 'all';
+$where_clauses = ["p.created_by = ?"];
+
+if ($status_filter === 'expired') {
+    $where_clauses[] = "(p.is_expired = 1)";
+} else {
+    $where_clauses[] = "(p.is_expired IS NULL OR p.is_expired = 0)";
+    if (in_array($status_filter, ['pending', 'approved', 'rejected'])) {
+        $where_clauses[] = "p.approval_status = '" . $farmcart->conn->real_escape_string($status_filter) . "'";
+    }
+}
+
 $products_sql = "SELECT
                     p.*,
                     c.category_name,
                     pi.image_url,
                     CASE
+                        WHEN p.is_expired = 1 THEN 'Expired'
                         WHEN p.approval_status = 'pending' THEN 'Awaiting Approval'
                         WHEN p.approval_status = 'approved' THEN 'Approved'
                         WHEN p.approval_status = 'rejected' THEN 'Rejected'
                         ELSE 'Unknown'
                     END as approval_text,
                     CASE
+                        WHEN p.is_expired = 1 THEN 'secondary'
                         WHEN p.approval_status = 'pending' THEN 'warning'
                         WHEN p.approval_status = 'approved' THEN 'success'
                         WHEN p.approval_status = 'rejected' THEN 'danger'
@@ -86,7 +118,7 @@ $products_sql = "SELECT
                  FROM products p
                  LEFT JOIN categories c ON p.category_id = c.category_id
                  LEFT JOIN product_images pi ON p.product_id = pi.product_id AND pi.is_primary = TRUE
-                 WHERE p.created_by = ?
+                 WHERE " . implode(' AND ', $where_clauses) . "
                  ORDER BY p.created_at DESC";
 
 $stmt = $farmcart->conn->prepare($products_sql);
@@ -257,6 +289,7 @@ $products_result = $stmt->get_result();
                             <a href="products.php?status=pending" class="btn btn-outline-warning <?= (isset($_GET['status']) && $_GET['status'] == 'pending') ? 'active' : '' ?>">Awaiting Approval</a>
                             <a href="products.php?status=approved" class="btn btn-outline-success <?= (isset($_GET['status']) && $_GET['status'] == 'approved') ? 'active' : '' ?>">Approved</a>
                             <a href="products.php?status=rejected" class="btn btn-outline-danger <?= (isset($_GET['status']) && $_GET['status'] == 'rejected') ? 'active' : '' ?>">Rejected</a>
+                            <a href="products.php?status=expired" class="btn btn-outline-secondary <?= (isset($_GET['status']) && $_GET['status'] == 'expired') ? 'active' : '' ?>">Expired</a>
                         </div>
                     </div>
                 </div>
@@ -265,7 +298,8 @@ $products_result = $stmt->get_result();
                 <div class="row">
                     <?php if ($products_result->num_rows > 0): ?>
                         <?php while ($product = $products_result->fetch_assoc()): ?>
-                            <div class="col-md-4 mb-4 product-card-wrapper" data-status="<?= strtolower($product['approval_status'] ?? '') ?>">
+                            <?php $status_key = (!empty($product['is_expired']) && $product['is_expired']) ? 'expired' : strtolower($product['approval_status'] ?? ''); ?>
+                            <div class="col-md-4 mb-4 product-card-wrapper" data-status="<?= $status_key ?>">
                                 <div class="card product-card h-100">
                                     <!-- Product Image -->
                                     <?php if (!empty($product['image_url'])): ?>
@@ -320,6 +354,14 @@ $products_result = $stmt->get_result();
                                             <i class="far fa-clock me-1"></i>
                                             Added: <?= date('M d, Y', strtotime($product['created_at'])) ?>
                                         </p>
+                                        <p class="card-text small text-muted">
+                                            <i class="fas fa-hourglass-half me-1"></i>
+                                            <?php if (!empty($product['expires_at'])): ?>
+                                                Expires: <?= date('M d, Y h:i A', strtotime($product['expires_at'])) ?>
+                                            <?php else: ?>
+                                                No expiry set
+                                            <?php endif; ?>
+                                        </p>
                                     </div>
 
                                     <div class="card-footer bg-white border-top-0">
@@ -340,10 +382,15 @@ $products_result = $stmt->get_result();
                                             <?php
                                             $check_column = $farmcart->conn->query("SHOW COLUMNS FROM products LIKE 'approval_status'");
                                             $has_approval_status = $check_column && $check_column->num_rows > 0;
-                                            $can_edit = !$has_approval_status || ($product['approval_status'] ?? '') == 'pending';
-                                            $is_rejected = $has_approval_status && ($product['approval_status'] ?? '') == 'rejected';
+                                            $is_expired = !empty($product['is_expired']);
+                                            $can_edit = !$is_expired && (!$has_approval_status || ($product['approval_status'] ?? '') == 'pending');
+                                            $is_rejected = !$is_expired && $has_approval_status && ($product['approval_status'] ?? '') == 'rejected';
                                             ?>
-                                            <?php if ($can_edit): ?>
+                                            <?php if ($is_expired): ?>
+                                                <span class="btn btn-sm btn-outline-secondary disabled" title="Expired products cannot be edited">
+                                                    <i class="fas fa-edit me-1"></i>Edit
+                                                </span>
+                                            <?php elseif ($can_edit): ?>
                                                 <a href="edit_product.php?id=<?= $product['product_id'] ?>"
                                                    class="btn btn-sm btn-outline-warning">
                                                     <i class="fas fa-edit me-1"></i>Edit
@@ -359,14 +406,14 @@ $products_result = $stmt->get_result();
                                                 </span>
                                             <?php endif; ?>
 
-                                            <!-- Delete Button (available for all products) -->
+                                            <!-- Delete Button (available; only action for expired) -->
                                             <button type="button" class="btn btn-sm btn-outline-danger"
                                                     onclick="confirmDelete(<?= $product['product_id'] ?>, '<?= htmlspecialchars(addslashes($product['product_name'])) ?>')">
                                                 <i class="fas fa-trash me-1"></i>Delete
                                             </button>
 
-                                            <!-- Add Inventory (only if approved) -->
-                                            <?php if ($has_approval_status && ($product['approval_status'] ?? '') == 'approved'): ?>
+                                            <!-- Add Inventory (only if approved and not expired) -->
+                                            <?php if (!$is_expired && $has_approval_status && ($product['approval_status'] ?? '') == 'approved'): ?>
                                                 <a href="add_inventory.php?product_id=<?= $product['product_id'] ?>"
                                                    class="btn btn-sm btn-success">
                                                     <i class="fas fa-box me-1"></i>Add Stock

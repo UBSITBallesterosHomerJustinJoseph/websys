@@ -80,6 +80,7 @@ if (!empty($image_url) && !preg_match('/^https?:\/\//', $image_url)) {
                                 'unit' => $row['unit_type'],
                                 'price' => number_format($row['base_price'], 2),
                                 'description' => $row['description'],
+                                'expires_at' => !empty($row['expires_at']) ? date('M d, Y h:i A', strtotime($row['expires_at'])) : 'No expiry set',
                             ], JSON_HEX_APOS | JSON_HEX_QUOT); ?>'>
                         <i class="fas fa-list me-1"></i>Details
                     </button>
