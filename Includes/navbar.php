@@ -249,6 +249,8 @@ if ($is_logged_in) {
                                 <!-- Farmer-specific menu -->
                                 <li><a class="dropdown-item" href="<?php echo $profile_path; ?>"><i class="fas fa-user-circle me-2"></i>Profile</a></li>
                                 <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="<?php echo $checkorders_path; ?>"><i class="fas fa-box me-2"></i>My Orders</a></li>
+                                <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="<?php echo $farmer_dashboard_path; ?>"><i class="fas fa-tachometer-alt me-2"></i>Farmer Dashboard</a></li>
                                 <li><hr class="dropdown-divider"></li>
 
@@ -258,7 +260,6 @@ if ($is_logged_in) {
                                 <li><a class="dropdown-item" href="<?php echo $edit_profile_path; ?>"><i class="fas fa-edit me-2"></i>Edit Profile</a></li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="<?php echo $checkorders_path; ?>"><i class="fas fa-box me-2"></i>My Orders</a></li>
-                                <li><a class="dropdown-item" href="<?php echo $wishlist_path; ?>"><i class="fas fa-heart me-2"></i>Wishlist</a></li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="<?php echo $admin_dashboard_path; ?>"><i class="fas fa-cog me-2"></i>Admin Dashboard</a></li>
                                 <li><hr class="dropdown-divider"></li>
@@ -269,7 +270,6 @@ if ($is_logged_in) {
                                 <li><a class="dropdown-item" href="<?php echo $edit_profile_path; ?>"><i class="fas fa-edit me-2"></i>Edit Profile</a></li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="<?php echo $checkorders_path; ?>"><i class="fas fa-box me-2"></i>My Orders</a></li>
-                                <li><a class="dropdown-item" href="<?php echo $wishlist_path; ?>"><i class="fas fa-heart me-2"></i>Wishlist</a></li>
                                 <li><hr class="dropdown-divider"></li>
 
                                 <?php if ($can_create_store): ?>

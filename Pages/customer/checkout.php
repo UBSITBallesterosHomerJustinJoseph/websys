@@ -206,5 +206,8 @@ $total = $subtotal; // pickup only, no shipping fee
   </div>
 
   <?php require_once '../../Includes/footer.php'; ?>
+
+  <!-- Bootstrap JS Bundle (required for dropdown functionality) -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
