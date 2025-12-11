@@ -219,52 +219,6 @@ $products = $sample_products[$category_type] ?? [];
         </div>
     </section>
 
-    <!-- Featured Farmers Section -->
-    <section class="featured-farmers">
-        <div class="container">
-            <h2 class="section-title text-center">Featured Farmers</h2>
-            <p class="section-subtitle text-center">Meet the local farmers behind these amazing products</p>
-
-            <div class="farmers-grid">
-                <div class="farmer-card">
-                    <div class="farmer-avatar">
-                        <span>🚜</span>
-                    </div>
-                    <h4>Green Valley Farm</h4>
-                    <p>Specializing in organic vegetables since 2010</p>
-                    <div class="farmer-rating">
-                        <i class="fas fa-star"></i>
-                        <span>4.8 (120 reviews)</span>
-                    </div>
-                </div>
-
-                <div class="farmer-card">
-                    <div class="farmer-avatar">
-                        <span>🌞</span>
-                    </div>
-                    <h4>Sunshine Farm</h4>
-                    <p>Fresh fruits and free-range poultry</p>
-                    <div class="farmer-rating">
-                        <i class="fas fa-star"></i>
-                        <span>4.9 (95 reviews)</span>
-                    </div>
-                </div>
-
-                <div class="farmer-card">
-                    <div class="farmer-avatar">
-                        <span>🏔️</span>
-                    </div>
-                    <h4>Mountain View Farm</h4>
-                    <p>Grass-fed livestock and dairy products</p>
-                    <div class="farmer-rating">
-                        <i class="fas fa-star"></i>
-                        <span>4.7 (80 reviews)</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
 
@@ -304,21 +258,6 @@ $products = $sample_products[$category_type] ?? [];
             });
         });
 
-        // Wishlist functionality
-        document.querySelectorAll('.btn-wishlist').forEach(button => {
-            button.addEventListener('click', function() {
-                const icon = this.querySelector('i');
-                if (icon.classList.contains('far')) {
-                    icon.classList.remove('far');
-                    icon.classList.add('fas');
-                    icon.style.color = '#ff4757';
-                } else {
-                    icon.classList.remove('fas');
-                    icon.classList.add('far');
-                    icon.style.color = '';
-                }
-            });
-        });
     </script>
 </body>
 </html>

@@ -83,9 +83,15 @@ $current_page = $_SERVER['REQUEST_URI'] ?? '';
 $is_products_page = strpos($current_page, 'products.php') !== false;
 $is_about_page = strpos($current_page, 'about.php') !== false;
 $is_contact_page = strpos($current_page, 'contacts.php') !== false;
+$is_profile_page = strpos($current_page, 'profile.php') !== false && 
+                  !strpos($current_page, 'edit-profile.php');
+$is_edit_profile_page = strpos($current_page, 'edit-profile.php') !== false;
+$is_setup_store_page = strpos($current_page, 'setUpStore.php') !== false || 
+                       strpos($current_page, 'setup-store.php') !== false;
 
 // Determine if navbar should start with solid color
-$start_solid = $is_products_page || $is_about_page || $is_contact_page;
+$start_solid = $is_products_page || $is_about_page || $is_contact_page || 
+               $is_profile_page || $is_edit_profile_page || $is_setup_store_page;
 ?>
 
 <style>
@@ -174,6 +180,16 @@ $start_solid = $is_products_page || $is_about_page || $is_contact_page;
         height: 2px;
         background-color: #DAE2CB;
         border-radius: 1px;
+    }
+    
+    /* Special styling for Account links */
+    .account-active {
+        color: #DAE2CB !important;
+        font-weight: 600 !important;
+        background: rgba(218, 226, 203, 0.1);
+        padding: 0.5rem 1rem !important;
+        border-radius: 0.375rem;
+        border: 1px solid rgba(218, 226, 203, 0.3);
     }
     
     .search-form {
@@ -303,11 +319,19 @@ $start_solid = $is_products_page || $is_about_page || $is_contact_page;
         transform: rotate(180deg);
     }
     
+    /* Highlight dropdown button when on account pages */
+    .user-dropdown-btn.account-active-nav {
+        background: rgba(218, 226, 203, 0.2);
+        border-color: rgba(218, 226, 203, 0.4);
+        color: #DAE2CB;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+    
     .dropdown-menu {
         position: absolute;
         top: calc(100% + 0.5rem);
         right: 0;
-        min-width: 220px;
+        min-width: 240px;
         background: white;
         border-radius: 12px;
         box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1), 0 2px 10px rgba(15, 46, 21, 0.05);
@@ -361,6 +385,14 @@ $start_solid = $is_products_page || $is_about_page || $is_contact_page;
         transform: translateX(2px);
     }
     
+    /* Active state for dropdown items */
+    .dropdown-item.active {
+        background: linear-gradient(135deg, #DAE2CB, #c0d0af);
+        color: #0F2E15;
+        font-weight: 600;
+        border-left: 3px solid #0F2E15;
+    }
+    
     .dropdown-item i {
         font-size: 1.125rem;
         color: #4b5563;
@@ -370,6 +402,10 @@ $start_solid = $is_products_page || $is_about_page || $is_contact_page;
     }
     
     .dropdown-item:hover i {
+        color: #0F2E15;
+    }
+    
+    .dropdown-item.active i {
         color: #0F2E15;
     }
     
@@ -438,6 +474,22 @@ $start_solid = $is_products_page || $is_about_page || $is_contact_page;
         font-size: 0.75rem;
         color: #6b7280;
         text-transform: capitalize;
+    }
+    
+    /* Setup store highlight */
+    .setup-store-highlight {
+        background: linear-gradient(135deg, #FFD700, #FFA500);
+        color: #0F2E15 !important;
+        border-radius: 6px;
+        margin: 0.25rem 0;
+    }
+    
+    .setup-store-highlight:hover {
+        background: linear-gradient(135deg, #FFC107, #FF8C00) !important;
+    }
+    
+    .setup-store-highlight i {
+        color: #0F2E15 !important;
     }
     
     /* Additional styles for dropdown */
@@ -550,10 +602,28 @@ $start_solid = $is_products_page || $is_about_page || $is_contact_page;
             </a>
             
             <div class="nav-links">
-                <a href="<?php echo $smart_home_path; ?>" <?php echo strpos($current_page, 'index.php') !== false && !$is_products_page && !$is_about_page && !$is_contact_page ? 'class="active"' : ''; ?>>Home</a>
-                <a href="<?php echo $products_path; ?>" <?php echo $is_products_page ? 'class="active"' : ''; ?>>Products</a>
-                <a href="<?php echo $about_path; ?>" <?php echo $is_about_page ? 'class="active"' : ''; ?>>About</a>
-                <a href="<?php echo $contact_path; ?>" <?php echo $is_contact_page ? 'class="active"' : ''; ?>>Contact</a>
+                <a href="<?php echo $smart_home_path; ?>" 
+                   <?php echo strpos($current_page, 'index.php') !== false && 
+                          !$is_products_page && 
+                          !$is_about_page && 
+                          !$is_contact_page && 
+                          !$is_profile_page && 
+                          !$is_edit_profile_page && 
+                          !$is_setup_store_page ? 'class="active"' : ''; ?>>
+                    Home
+                </a>
+                <a href="<?php echo $products_path; ?>" 
+                   <?php echo $is_products_page ? 'class="active"' : ''; ?>>
+                    Products
+                </a>
+                <a href="<?php echo $about_path; ?>" 
+                   <?php echo $is_about_page ? 'class="active"' : ''; ?>>
+                    About
+                </a>
+                <a href="<?php echo $contact_path; ?>" 
+                   <?php echo $is_contact_page ? 'class="active"' : ''; ?>>
+                    Contact
+                </a>
             </div>
             
             <form class="search-form" id="searchForm">
@@ -596,9 +666,13 @@ $start_solid = $is_products_page || $is_about_page || $is_contact_page;
                                 $user_initials = strtoupper(substr($user_data['email'], 0, 1));
                             }
                         }
+                        
+                        // Check if user is on account-related pages
+                        $is_on_account_page = $is_profile_page || $is_edit_profile_page || $is_setup_store_page;
                         ?>
                         
-                        <button class="user-dropdown-btn" type="button" id="userDropdown" onclick="toggleDropdown()">
+                        <button class="user-dropdown-btn <?php echo $is_on_account_page ? 'account-active-nav' : ''; ?>" 
+                                type="button" id="userDropdown" onclick="toggleDropdown()">
                             <i class="ri-user-circle-line"></i> 
                             <span class="truncate"><?php echo htmlspecialchars($display_name); ?></span>
                             <i class="ri-arrow-down-s-line ml-auto" style="margin-left: auto;"></i>
@@ -623,7 +697,7 @@ $start_solid = $is_products_page || $is_about_page || $is_contact_page;
                                     <i class="ri-dashboard-line"></i> 
                                     <span>Dashboard</span>
                                 </a>
-                                <a href="<?php echo $profile_path; ?>" class="dropdown-item">
+                                <a href="<?php echo $profile_path; ?>" class="dropdown-item <?php echo $is_profile_page ? 'active' : ''; ?>">
                                     <i class="ri-user-line"></i> 
                                     <span>Profile</span>
                                 </a>
@@ -638,22 +712,22 @@ $start_solid = $is_products_page || $is_about_page || $is_contact_page;
                                     <i class="ri-dashboard-line"></i> 
                                     <span>Admin Dashboard</span>
                                 </a>
-                                <a href="<?php echo $profile_path; ?>" class="dropdown-item">
+                                <a href="<?php echo $profile_path; ?>" class="dropdown-item <?php echo $is_profile_page ? 'active' : ''; ?>">
                                     <i class="ri-user-line"></i> 
                                     <span>Profile</span>
                                 </a>
-                                <a href="<?php echo $edit_profile_path; ?>" class="dropdown-item">
+                                <a href="<?php echo $edit_profile_path; ?>" class="dropdown-item <?php echo $is_edit_profile_page ? 'active' : ''; ?>">
                                     <i class="ri-edit-line"></i> 
                                     <span>Edit Profile</span>
                                 </a>
                                 
                             <?php else: ?>
                                 <div class="dropdown-header">My Account</div>
-                                <a href="<?php echo $profile_path; ?>" class="dropdown-item">
+                                <a href="<?php echo $profile_path; ?>" class="dropdown-item <?php echo $is_profile_page ? 'active' : ''; ?>">
                                     <i class="ri-user-line"></i> 
                                     <span>Profile</span>
                                 </a>
-                                <a href="<?php echo $edit_profile_path; ?>" class="dropdown-item">
+                                <a href="<?php echo $edit_profile_path; ?>" class="dropdown-item <?php echo $is_edit_profile_page ? 'active' : ''; ?>">
                                     <i class="ri-edit-line"></i> 
                                     <span>Edit Profile</span>
                                 </a>
@@ -662,10 +736,10 @@ $start_solid = $is_products_page || $is_about_page || $is_contact_page;
                                     <span>My Orders</span>
                                 </a>
                                 <?php if ($can_create_store): ?>
-                                    <a href="<?php echo $setup_store_path; ?>" class="dropdown-item">
+                                    <a href="<?php echo $setup_store_path; ?>" class="dropdown-item setup-store-highlight <?php echo $is_setup_store_page ? 'active' : ''; ?>">
                                         <i class="ri-store-2-line"></i> 
                                         <span>Setup Your Store</span>
-                                        <i class="ri-sparkling-line" style="color: #f59e0b;"></i>
+                                        <i class="ri-sparkling-line" style="color: #0F2E15;"></i>
                                     </a>
                                 <?php endif; ?>
                             <?php endif; ?>
@@ -746,7 +820,7 @@ $start_solid = $is_products_page || $is_about_page || $is_contact_page;
         window.addEventListener('scroll', function() {
             const nav = document.querySelector('nav');
             <?php if ($start_solid): ?>
-                // On products/about/contact pages, navbar is already solid
+                // On products/about/contact/profile/setup store pages, navbar is already solid
                 nav.classList.add('scrolled');
             <?php else: ?>
                 // On other pages, add scrolled class when scrolling
@@ -763,6 +837,14 @@ $start_solid = $is_products_page || $is_about_page || $is_contact_page;
             const nav = document.querySelector('nav');
             <?php if ($start_solid): ?>
                 nav.classList.add('scrolled');
+            <?php endif; ?>
+            
+            // Highlight user dropdown button if on account page
+            const userDropdownBtn = document.getElementById('userDropdown');
+            <?php if ($is_profile_page || $is_edit_profile_page || $is_setup_store_page): ?>
+                if (userDropdownBtn) {
+                    userDropdownBtn.classList.add('account-active-nav');
+                }
             <?php endif; ?>
         });
         

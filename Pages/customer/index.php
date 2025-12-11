@@ -380,24 +380,6 @@ $currentYear = date("Y");
         </div>
     </section>
 
-        <!-- Newsletter Section -->
-        <section class="newsletter-section">
-            <div class="container">
-                <div class="newsletter-content">
-                    <h2>Stay Updated with Fresh Harvests</h2>
-                    <p>Get notified about seasonal offers and new arrivals</p>
-                    <form class="newsletter-form">
-                        <div class="input-group">
-                            <input type="email" placeholder="Enter your email" class="form-control">
-                            <button type="submit" class="btn-primary">
-                                <i class="fas fa-paper-plane me-2"></i>
-                                Subscribe
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </section>
 
         <!-- Bootstrap JS -->
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
