@@ -77,6 +77,15 @@ if ($is_logged_in) {
         $user_data = $farmcart->get_user($_SESSION['user_id']);
     }
 }
+
+// Get current page URL to determine active page
+$current_page = $_SERVER['REQUEST_URI'] ?? '';
+$is_products_page = strpos($current_page, 'products.php') !== false;
+$is_about_page = strpos($current_page, 'about.php') !== false;
+$is_contact_page = strpos($current_page, 'contacts.php') !== false;
+
+// Determine if navbar should start with solid color
+$start_solid = $is_products_page || $is_about_page || $is_contact_page;
 ?>
 
 <style>
@@ -88,7 +97,12 @@ if ($is_logged_in) {
         right: 0;
         z-index: 50;
         transition: all 0.3s ease;
+        <?php if ($start_solid): ?>
+        background: rgba(15, 46, 21, 0.95);
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        <?php else: ?>
         background: transparent;
+        <?php endif; ?>
     }
     
     nav.scrolled {
@@ -137,10 +151,29 @@ if ($is_logged_in) {
         font-size: 0.875rem;
         font-weight: 500;
         transition: color 0.3s;
+        position: relative;
+        padding: 0.5rem 0;
     }
     
     .nav-links a:hover {
         color: #DAE2CB;
+    }
+    
+    /* Active link indicator */
+    .nav-links a.active {
+        color: #DAE2CB;
+        font-weight: 600;
+    }
+    
+    .nav-links a.active::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background-color: #DAE2CB;
+        border-radius: 1px;
     }
     
     .search-form {
@@ -517,10 +550,10 @@ if ($is_logged_in) {
             </a>
             
             <div class="nav-links">
-                <a href="<?php echo $smart_home_path; ?>">Home</a>
-                <a href="<?php echo $products_path; ?>">Products</a>
-                <a href="<?php echo $about_path; ?>">About</a>
-                <a href="<?php echo $contact_path; ?>">Contact</a>
+                <a href="<?php echo $smart_home_path; ?>" <?php echo strpos($current_page, 'index.php') !== false && !$is_products_page && !$is_about_page && !$is_contact_page ? 'class="active"' : ''; ?>>Home</a>
+                <a href="<?php echo $products_path; ?>" <?php echo $is_products_page ? 'class="active"' : ''; ?>>Products</a>
+                <a href="<?php echo $about_path; ?>" <?php echo $is_about_page ? 'class="active"' : ''; ?>>About</a>
+                <a href="<?php echo $contact_path; ?>" <?php echo $is_contact_page ? 'class="active"' : ''; ?>>Contact</a>
             </div>
             
             <form class="search-form" id="searchForm">
@@ -656,7 +689,7 @@ if ($is_logged_in) {
     </nav>
 
     <script>
-        // Your JavaScript remains the same
+        // Your JavaScript remains mostly the same
         function toggleDropdown() {
             const menu = document.getElementById('dropdownMenu');
             const button = document.getElementById('userDropdown');
@@ -709,14 +742,28 @@ if ($is_logged_in) {
             }
         });
         
-        // Update nav background on scroll
+        // Update nav background on scroll - modified for pages that start solid
         window.addEventListener('scroll', function() {
             const nav = document.querySelector('nav');
-            if (window.scrollY > 100) {
+            <?php if ($start_solid): ?>
+                // On products/about/contact pages, navbar is already solid
                 nav.classList.add('scrolled');
-            } else {
-                nav.classList.remove('scrolled');
-            }
+            <?php else: ?>
+                // On other pages, add scrolled class when scrolling
+                if (window.scrollY > 100) {
+                    nav.classList.add('scrolled');
+                } else {
+                    nav.classList.remove('scrolled');
+                }
+            <?php endif; ?>
+        });
+        
+        // Initialize navbar for pages that start solid
+        document.addEventListener('DOMContentLoaded', function() {
+            const nav = document.querySelector('nav');
+            <?php if ($start_solid): ?>
+                nav.classList.add('scrolled');
+            <?php endif; ?>
         });
         
         // Search functionality - FIXED for absolute paths
