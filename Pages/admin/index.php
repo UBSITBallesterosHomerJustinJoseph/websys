@@ -563,6 +563,45 @@ $tab = isset($_GET['tab']) ? $_GET['tab'] : 'pending';
         </div>
     </div>
 
+    <!-- Product Details Modal -->
+    <div class="modal fade" id="productDetailsModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Product Information</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Product Name</label>
+                            <div class="form-control bg-light" id="detailName"></div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Category</label>
+                            <div class="form-control bg-light" id="detailCategory"></div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Unit Type</label>
+                            <div class="form-control bg-light" id="detailUnit"></div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Base Price (₱)</label>
+                            <div class="form-control bg-light" id="detailPrice"></div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Product Description</label>
+                            <div class="form-control bg-light" id="detailDescription" style="min-height: 120px;"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <!-- Custom Admin JS -->
@@ -574,6 +613,30 @@ $tab = isset($_GET['tab']) ? $_GET['tab'] : 'pending';
             document.getElementById('imageModalLabel').textContent = productName;
             const modal = new bootstrap.Modal(document.getElementById('imageModal'));
             modal.show();
+        }
+
+        // Product details modal population
+        const detailsModal = document.getElementById('productDetailsModal');
+        if (detailsModal) {
+            detailsModal.addEventListener('show.bs.modal', event => {
+                const button = event.relatedTarget;
+                if (!button) return;
+                const productData = button.getAttribute('data-product');
+                if (!productData) return;
+                try {
+                    const data = JSON.parse(productData);
+                    document.getElementById('detailName').textContent = data.name || '—';
+                    const categoryText = data.category
+                        ? `${data.category}${data.category_type ? ' (' + data.category_type + ')' : ''}`
+                        : '—';
+                    document.getElementById('detailCategory').textContent = categoryText;
+                    document.getElementById('detailUnit').textContent = data.unit || '—';
+                    document.getElementById('detailPrice').textContent = data.price ? `₱${data.price}` : '—';
+                    document.getElementById('detailDescription').textContent = data.description || '—';
+                } catch (e) {
+                    console.error('Failed to parse product data', e);
+                }
+            });
         }
     </script>
 </body>

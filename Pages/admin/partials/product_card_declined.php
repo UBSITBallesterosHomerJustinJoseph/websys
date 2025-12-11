@@ -57,7 +57,6 @@ if (!empty($image_url) && !preg_match('/^https?:\/\//', $image_url)) {
 
             <p class="mb-2">
                 <strong class="text-success fs-5">₱<?= number_format($row['base_price'], 2); ?></strong>
-                <span class="badge bg-secondary ms-2"><?= strtoupper($row['unit_type']); ?></span>
             </p>
             <p class="text-muted small mb-2">
                 <i class="fas fa-weight me-1"></i>Per <?= htmlspecialchars($row['unit_type']); ?>

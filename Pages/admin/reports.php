@@ -10,19 +10,28 @@ if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
 
 $admin_id = $_SESSION['user_id'];
 
+// Helper to get counts for sidebar badges
+function admin_get_count($conn, $sql) {
+    $result = $conn->query($sql);
+    if ($result && $row = $result->fetch_assoc()) {
+        return (int)($row['count'] ?? 0);
+    }
+    return 0;
+}
+
+// Sidebar stats so badges remain visible on this page
+$stats = [
+    'pending' => admin_get_count($farmcart->conn, "SELECT COUNT(*) as count FROM products WHERE approval_status = 'pending'"),
+    'approved' => admin_get_count($farmcart->conn, "SELECT COUNT(*) as count FROM products WHERE approval_status = 'approved'"),
+    'declined' => admin_get_count($farmcart->conn, "SELECT COUNT(*) as count FROM products WHERE approval_status = 'rejected'"),
+    'unverified_farmers' => admin_get_count($farmcart->conn, "SELECT COUNT(*) as count FROM farmer_profiles WHERE is_verified_farmer = 0"),
+    'categories' => admin_get_count($farmcart->conn, "SELECT COUNT(*) as count FROM categories"),
+    'users' => admin_get_count($farmcart->conn, "SELECT COUNT(*) as count FROM users")
+];
+
 // Get date range filters (default to last 30 days)
 $start_date = isset($_GET['start_date']) ? $_GET['start_date'] : date('Y-m-d', strtotime('-30 days'));
 $end_date = isset($_GET['end_date']) ? $_GET['end_date'] : date('Y-m-d');
-
-// Include admin sidebar stats
-$stats = [
-    'pending' => 0,
-    'approved' => 0,
-    'declined' => 0,
-    'unverified_farmers' => 0,
-    'categories' => 0,
-    'users' => 0
-];
 
 // Calculate statistics
 // Total Revenue

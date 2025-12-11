@@ -55,11 +55,6 @@ if (!empty($image_url) && !preg_match('/^https?:\/\//', $image_url)) {
 
             <p class="mb-2">
                 <strong class="text-success fs-5">₱<?= number_format($row['base_price'], 2); ?></strong>
-                <?php if (!empty($row['unit_type'])): ?>
-                    <span class="badge bg-secondary ms-2"><?= strtoupper($row['unit_type']); ?></span>
-                <?php else: ?>
-                    <span class="badge bg-secondary ms-2">N/A</span>
-                <?php endif; ?>
             </p>
             <p class="text-muted small mb-2">
                 <i class="fas fa-weight me-1"></i>Per <?= !empty($row['unit_type']) ? htmlspecialchars($row['unit_type']) : 'unit'; ?>
@@ -74,6 +69,20 @@ if (!empty($image_url) && !preg_match('/^https?:\/\//', $image_url)) {
         <?php if ($show_actions): ?>
             <div class="card-footer bg-white border-top-0 pt-0">
                 <div class="action-buttons d-flex flex-wrap gap-2">
+                    <button type="button"
+                            class="btn btn-sm btn-outline-secondary"
+                            data-bs-toggle="modal"
+                            data-bs-target="#productDetailsModal"
+                            data-product='<?= json_encode([
+                                'name' => $row['product_name'],
+                                'category' => $row['category_name'],
+                                'category_type' => $row['category_type'],
+                                'unit' => $row['unit_type'],
+                                'price' => number_format($row['base_price'], 2),
+                                'description' => $row['description'],
+                            ], JSON_HEX_APOS | JSON_HEX_QUOT); ?>'>
+                        <i class="fas fa-list me-1"></i>Details
+                    </button>
                     <?php if (!empty($image_url)): ?>
                         <button type="button" class="btn btn-sm btn-outline-primary"
                                 onclick="viewImage('<?= htmlspecialchars($image_url, ENT_QUOTES) ?>', '<?= htmlspecialchars($row['product_name'], ENT_QUOTES) ?>')">

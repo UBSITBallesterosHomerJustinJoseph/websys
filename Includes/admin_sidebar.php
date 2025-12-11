@@ -90,13 +90,6 @@ $total_users = isset($stats['users']) ? $stats['users'] : 0;
             </li>
 
             <li class="nav-item mb-2">
-                <a class="nav-link admin-sidebar-link <?php echo ($current_page == 'orders.php') ? 'active' : ''; ?>" href="orders.php">
-                    <i class="fas fa-shopping-cart me-2"></i>
-                    Orders Management
-                </a>
-            </li>
-
-            <li class="nav-item mb-2">
                 <a class="nav-link admin-sidebar-link <?php echo ($current_page == 'reports.php') ? 'active' : ''; ?>" href="reports.php">
                     <i class="fas fa-chart-bar me-2"></i>
                     Reports & Analytics

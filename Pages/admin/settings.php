@@ -12,6 +12,25 @@ $admin_id = $_SESSION['user_id'];
 $success = '';
 $error = '';
 
+// Helper to get counts for sidebar badges
+function admin_get_count($conn, $sql) {
+    $result = $conn->query($sql);
+    if ($result && $row = $result->fetch_assoc()) {
+        return (int)($row['count'] ?? 0);
+    }
+    return 0;
+}
+
+// Sidebar stats (ensure badges still show on non-dashboard pages)
+$stats = [
+    'pending' => admin_get_count($farmcart->conn, "SELECT COUNT(*) as count FROM products WHERE approval_status = 'pending'"),
+    'approved' => admin_get_count($farmcart->conn, "SELECT COUNT(*) as count FROM products WHERE approval_status = 'approved'"),
+    'declined' => admin_get_count($farmcart->conn, "SELECT COUNT(*) as count FROM products WHERE approval_status = 'rejected'"),
+    'unverified_farmers' => admin_get_count($farmcart->conn, "SELECT COUNT(*) as count FROM farmer_profiles WHERE is_verified_farmer = 0"),
+    'categories' => admin_get_count($farmcart->conn, "SELECT COUNT(*) as count FROM categories"),
+    'users' => admin_get_count($farmcart->conn, "SELECT COUNT(*) as count FROM users")
+];
+
 // Create settings table if it doesn't exist
 $create_table = "CREATE TABLE IF NOT EXISTS system_settings (
     setting_key VARCHAR(100) PRIMARY KEY,
@@ -64,14 +83,6 @@ $maintenance_mode = isset($current_settings['maintenance_mode']) ? (int)$current
 $currency_symbol = $current_settings['currency_symbol'] ?? '₱';
 
 // Include admin sidebar stats
-$stats = [
-    'pending' => 0,
-    'approved' => 0,
-    'declined' => 0,
-    'unverified_farmers' => 0,
-    'categories' => 0,
-    'users' => 0
-];
 ?>
 
 <!DOCTYPE html>
