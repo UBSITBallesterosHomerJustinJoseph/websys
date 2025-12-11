@@ -57,6 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_product'])) {
     $description = $farmcart->conn->real_escape_string($_POST['description']);
     $unit_type = $farmcart->conn->real_escape_string($_POST['unit_type']);
     $base_price = floatval($_POST['base_price']);
+    $initial_quantity = isset($_POST['initial_quantity']) ? (int)$_POST['initial_quantity'] : 0;
     $exp_months = isset($_POST['exp_months']) ? max(0, (int)$_POST['exp_months']) : 0;
     $exp_days = isset($_POST['exp_days']) ? max(0, (int)$_POST['exp_days']) : 0;
     $exp_hours = isset($_POST['exp_hours']) ? max(0, (int)$_POST['exp_hours']) : 0;
@@ -67,18 +68,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_product'])) {
     // Validate required fields
     if (empty($product_name) || empty($category_id) || empty($unit_type) || $base_price <= 0) {
         $error = "Please fill in all required fields with valid values.";
+    } elseif ($initial_quantity <= 0) {
+        $error = "Please provide an initial quantity greater than zero.";
     } elseif ($expiration_duration_seconds <= 0) {
         $error = "Please provide an expiration duration greater than zero.";
     } elseif (!$has_image) {
         $error = "Product image is required.";
     } else {
         // Insert product with pending approval status and not listed
-        $sql = "INSERT INTO products (product_name, description, category_id, unit_type, base_price, created_by, approval_status, is_active, is_listed, expiration_duration_seconds, is_expired)
-                VALUES (?, ?, ?, ?, ?, ?, 'pending', TRUE, FALSE, ?, 0)";
+        $sql = "INSERT INTO products (product_name, description, category_id, unit_type, base_price, quantity, created_by, approval_status, is_active, is_listed, expiration_duration_seconds, is_expired)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', TRUE, FALSE, ?, 0)";
         $stmt = $farmcart->conn->prepare($sql);
 
         if ($stmt) {
-            $stmt->bind_param("ssisdii", $product_name, $description, $category_id, $unit_type, $base_price, $farmer_id, $expiration_duration_seconds);
+            $stmt->bind_param("ssisdiisi", $product_name, $description, $category_id, $unit_type, $base_price, $initial_quantity, $farmer_id, $expiration_duration_seconds);
 
             if ($stmt->execute()) {
                 $product_id = $stmt->insert_id;
@@ -109,6 +112,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_product'])) {
                         }
                     }
                 }
+
+                // Quantity is now stored directly in products table, no need for initial lot
 
                 // Send notification to admin (you need to implement this function)
                 sendAdminNotification($product_id, $product_name, $farmer_id, $farmer_name);
@@ -297,7 +302,7 @@ function sendAdminNotification($product_id, $product_name, $farmer_id, $farmer_n
 
                   <div class="col-md-6">
                     <label class="form-label fw-semibold required-field">Unit Type</label>
-                    <select name="unit_type" class="form-control form-control-lg" required>
+                    <select name="unit_type" id="unit_type" class="form-control form-control-lg" required onchange="updateUnitDisplay()">
                       <option value="">Select Unit</option>
                       <option value="kg" <?= (isset($_POST['unit_type']) && $_POST['unit_type'] == 'kg') ? 'selected' : '' ?>>Kilogram (kg)</option>
                       <option value="g" <?= (isset($_POST['unit_type']) && $_POST['unit_type'] == 'g') ? 'selected' : '' ?>>Gram (g)</option>
@@ -318,6 +323,17 @@ function sendAdminNotification($product_id, $product_name, $farmer_id, $farmer_n
                              placeholder="0.00" step="0.01" min="0.01" 
                              value="<?= isset($_POST['base_price']) ? htmlspecialchars($_POST['base_price']) : '' ?>" required>
                     </div>
+                  </div>
+
+                  <div class="col-md-6">
+                    <label class="form-label fw-semibold required-field">Initial Quantity</label>
+                    <div class="input-group">
+                      <input type="number" name="initial_quantity" class="form-control form-control-lg" 
+                             placeholder="0" step="1" min="1" 
+                             value="<?= isset($_POST['initial_quantity']) ? (int)$_POST['initial_quantity'] : '' ?>" required>
+                      <span class="input-group-text" id="unit-display">units</span>
+                    </div>
+                    <div class="form-text">Initial stock quantity for this product (whole numbers only). You can add more stock later.</div>
                   </div>
 
                   <div class="col-12">
@@ -443,13 +459,30 @@ function sendAdminNotification($product_id, $product_name, $farmer_id, $farmer_n
       const form = document.getElementById('productForm');
       form.addEventListener('submit', function(e) {
         const price = document.querySelector('input[name="base_price"]');
+        const quantity = document.querySelector('input[name="initial_quantity"]');
         if (price && parseFloat(price.value) <= 0) {
           e.preventDefault();
           alert('Please enter a valid price greater than 0.');
           price.focus();
+          return;
+        }
+        if (quantity && (parseInt(quantity.value) <= 0 || !Number.isInteger(parseFloat(quantity.value)))) {
+          e.preventDefault();
+          alert('Please enter a valid whole number quantity greater than 0.');
+          quantity.focus();
         }
       });
     });
+
+    function updateUnitDisplay() {
+      const unitType = document.getElementById('unit_type').value;
+      const unitDisplay = document.getElementById('unit-display');
+      if (unitDisplay && unitType) {
+        unitDisplay.textContent = unitType;
+      } else {
+        unitDisplay.textContent = 'units';
+      }
+    }
   </script>
 </body>
 </html>

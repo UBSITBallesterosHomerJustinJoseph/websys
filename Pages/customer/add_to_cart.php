@@ -26,6 +26,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $product = $productResult->fetch_assoc();
         $checkProduct->close();
         
+        // Check available quantity from products table
+        $checkQuantity = $farmcart->conn->prepare("SELECT quantity FROM products WHERE product_id = ?");
+        $checkQuantity->bind_param("i", $productId);
+        $checkQuantity->execute();
+        $quantityResult = $checkQuantity->get_result();
+        $quantityData = $quantityResult->fetch_assoc();
+        $totalAvailable = (int)($quantityData['quantity'] ?? 0);
+        $checkQuantity->close();
+        
         // If user is logged in, associate the cart with the user
         if ($userId) {
             // Check if carts table exists, if not create it
@@ -51,6 +60,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $result = $stmt->get_result();
 
             if ($result->num_rows > 0) {
+                // Get current cart quantity
+                $cartItem = $result->fetch_assoc();
+                $currentCartQty = $cartItem['quantity'];
+                $newTotalQty = $currentCartQty + $quantity;
+                
+                // Check if new total exceeds available quantity
+                if ($newTotalQty > $totalAvailable) {
+                    echo json_encode(['success' => false, 'message' => "Cannot add more. Only {$totalAvailable} available. You already have {$currentCartQty} in cart."]);
+                    $stmt->close();
+                    exit;
+                }
+                
                 // If product already in cart, update quantity
                 $sql = "UPDATE carts SET quantity = quantity + ? WHERE user_id = ? AND product_id = ?";
                 $stmt = $farmcart->conn->prepare($sql);
@@ -61,6 +82,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     echo json_encode(['success' => false, 'message' => 'Failed to update cart.']);
                 }
             } else {
+                // Check if quantity exceeds available
+                if ($quantity > $totalAvailable) {
+                    echo json_encode(['success' => false, 'message' => "Cannot add. Only {$totalAvailable} available."]);
+                    exit;
+                }
+                
                 // Add new product to cart
                 $sql = "INSERT INTO carts (user_id, product_id, quantity) VALUES (?, ?, ?)";
                 $stmt = $farmcart->conn->prepare($sql);
@@ -77,6 +104,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!isset($_SESSION['guest_cart'])) {
                 $_SESSION['guest_cart'] = [];
             }
+            // Check available quantity for guest
+            if ($quantity > $totalAvailable) {
+                echo json_encode(['success' => false, 'message' => "Cannot add. Only {$totalAvailable} available."]);
+                exit;
+            }
+            
             if (!isset($_SESSION['guest_cart'][$productId])) {
                 $_SESSION['guest_cart'][$productId] = [
                     'product_id' => $productId,
@@ -84,6 +117,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'base_price' => $product['base_price']
                 ];
             }
+            
+            $newGuestQty = $_SESSION['guest_cart'][$productId]['quantity'] + $quantity;
+            if ($newGuestQty > $totalAvailable) {
+                echo json_encode(['success' => false, 'message' => "Cannot add more. Only {$totalAvailable} available. You already have {$_SESSION['guest_cart'][$productId]['quantity']} in cart."]);
+                exit;
+            }
+            
             $_SESSION['guest_cart'][$productId]['quantity'] += $quantity;
             echo json_encode(['success' => true, 'message' => 'Product added to your cart (Guest).']);
         }

@@ -19,6 +19,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($userId) {
         // Logged-in user - cartId should be numeric
         if ($action === 'update' && $quantity !== null && $quantity > 0) {
+            // Check available quantity from products table
+            $checkQty = $farmcart->conn->prepare("SELECT quantity FROM products WHERE product_id = ?");
+            $checkQty->bind_param("i", $productId);
+            $checkQty->execute();
+            $qtyResult = $checkQty->get_result();
+            $qtyData = $qtyResult->fetch_assoc();
+            $totalAvailable = (int)($qtyData['quantity'] ?? 0);
+            $checkQty->close();
+            
+            if ($quantity > $totalAvailable) {
+                echo json_encode(['success' => false, 'message' => "Cannot update. Only {$totalAvailable} available."]);
+                exit;
+            }
+            
             $cartIdInt = (int)$cartId;
             $sql = "UPDATE carts SET quantity = ? WHERE cart_id = ? AND user_id = ?";
             $stmt = $farmcart->conn->prepare($sql);
@@ -43,20 +57,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             echo json_encode(['success' => false, 'message' => 'Invalid action.']);
         }
-    } else {
-        // Guest user
-        if (!isset($_SESSION['guest_cart'])) {
-            $_SESSION['guest_cart'] = [];
-        }
-        
-        if ($action === 'update' && $quantity !== null && $quantity > 0) {
-            if (isset($_SESSION['guest_cart'][$productId])) {
-                $_SESSION['guest_cart'][$productId]['quantity'] = $quantity;
-                echo json_encode(['success' => true, 'message' => 'Cart updated.']);
-            } else {
-                echo json_encode(['success' => false, 'message' => 'Item not found in cart.']);
+        } else {
+            // Guest user
+            if (!isset($_SESSION['guest_cart'])) {
+                $_SESSION['guest_cart'] = [];
             }
-        } elseif ($action === 'remove') {
+            
+            if ($action === 'update' && $quantity !== null && $quantity > 0) {
+                // Check available quantity for guest from products table
+                $checkQty = $farmcart->conn->prepare("SELECT quantity FROM products WHERE product_id = ?");
+                $checkQty->bind_param("i", $productId);
+                $checkQty->execute();
+                $qtyResult = $checkQty->get_result();
+                $qtyData = $qtyResult->fetch_assoc();
+                $totalAvailable = (int)($qtyData['quantity'] ?? 0);
+                $checkQty->close();
+                
+                if ($quantity > $totalAvailable) {
+                    echo json_encode(['success' => false, 'message' => "Cannot update. Only {$totalAvailable} available."]);
+                    exit;
+                }
+                
+                if (isset($_SESSION['guest_cart'][$productId])) {
+                    $_SESSION['guest_cart'][$productId]['quantity'] = $quantity;
+                    echo json_encode(['success' => true, 'message' => 'Cart updated.']);
+                } else {
+                    echo json_encode(['success' => false, 'message' => 'Item not found in cart.']);
+                }
+            } elseif ($action === 'remove') {
             if (isset($_SESSION['guest_cart'][$productId])) {
                 unset($_SESSION['guest_cart'][$productId]);
                 echo json_encode(['success' => true, 'message' => 'Item removed from cart.']);

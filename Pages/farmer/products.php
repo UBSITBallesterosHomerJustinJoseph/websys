@@ -101,6 +101,7 @@ $products_sql = "SELECT
                     p.*,
                     c.category_name,
                     pi.image_url,
+                    COALESCE(p.quantity, 0) as quantity,
                     CASE
                         WHEN p.is_expired = 1 THEN 'Expired'
                         WHEN p.approval_status = 'pending' THEN 'Awaiting Approval'
@@ -334,6 +335,15 @@ $products_result = $stmt->get_result();
                                             <strong>₱<?= number_format($product['base_price'], 2) ?></strong>
                                             <span class="text-muted">per <?= $product['unit_type'] ?></span>
                                         </p>
+                                        
+                                        <!-- Stock Quantity -->
+                                        <p class="card-text">
+                                            <i class="fas fa-box me-1"></i>
+                                            <strong>Stock:</strong> 
+                                            <span class="badge bg-<?= ($product['quantity'] ?? 0) > 0 ? 'success' : 'danger'; ?>">
+                                                <?= number_format($product['quantity'] ?? 0, 0); ?> <?= $product['unit_type'] ?>
+                                            </span>
+                                        </p>
 
                                         <!-- Description Preview -->
                                         <p class="card-text small text-truncate" style="max-height: 60px; overflow: hidden;">
@@ -412,12 +422,13 @@ $products_result = $stmt->get_result();
                                                 <i class="fas fa-trash me-1"></i>Delete
                                             </button>
 
-                                            <!-- Add Inventory (only if approved and not expired) -->
+                                            <!-- Add Stock Button (only if approved and not expired) -->
                                             <?php if (!$is_expired && $has_approval_status && ($product['approval_status'] ?? '') == 'approved'): ?>
-                                                <a href="add_inventory.php?product_id=<?= $product['product_id'] ?>"
-                                                   class="btn btn-sm btn-success">
+                                                <button type="button" 
+                                                        class="btn btn-sm btn-success"
+                                                        onclick="openAddStockModal(<?= $product['product_id'] ?>, '<?= htmlspecialchars(addslashes($product['product_name'])) ?>', <?= (int)($product['quantity'] ?? 0) ?>)">
                                                     <i class="fas fa-box me-1"></i>Add Stock
-                                                </a>
+                                                </button>
                                             <?php endif; ?>
                                         </div>
                                     </div>
@@ -451,6 +462,46 @@ $products_result = $stmt->get_result();
                 </div>
                 <div class="modal-body text-center">
                     <img id="modalImage" src="" alt="Product Image" class="img-fluid rounded">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Stock Modal -->
+    <div class="modal fade" id="addStockModal" tabindex="-1" aria-labelledby="addStockModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title" id="addStockModalLabel">
+                        <i class="fas fa-box me-2"></i>Add Stock
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addStockForm">
+                        <input type="hidden" id="stock_product_id" name="product_id">
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Product</label>
+                            <input type="text" id="stock_product_name" class="form-control" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Current Stock</label>
+                            <input type="text" id="stock_current_qty" class="form-control" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Quantity to Add <span class="text-danger">*</span></label>
+                            <input type="number" id="stock_quantity" name="quantity" class="form-control form-control-lg" 
+                                   min="1" step="1" required placeholder="Enter quantity">
+                            <div class="form-text">Enter whole numbers only (e.g., 10, 50, 100)</div>
+                        </div>
+                        <div id="stockMessage" class="alert d-none"></div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-success" onclick="submitAddStock()">
+                        <i class="fas fa-plus me-2"></i>Add Stock
+                    </button>
                 </div>
             </div>
         </div>
@@ -490,6 +541,78 @@ $products_result = $stmt->get_result();
             // Show all products
             document.querySelectorAll('.product-card-wrapper').forEach(wrapper => {
                 wrapper.style.display = 'block';
+            });
+        }
+
+        // Add Stock Modal Functions
+        function openAddStockModal(productId, productName, currentQty) {
+            document.getElementById('stock_product_id').value = productId;
+            document.getElementById('stock_product_name').value = productName;
+            document.getElementById('stock_current_qty').value = currentQty + ' units';
+            document.getElementById('stock_quantity').value = '';
+            document.getElementById('stockMessage').classList.add('d-none');
+            const modal = new bootstrap.Modal(document.getElementById('addStockModal'));
+            modal.show();
+        }
+
+        function submitAddStock() {
+            const productId = document.getElementById('stock_product_id').value;
+            const quantity = parseInt(document.getElementById('stock_quantity').value);
+            const messageDiv = document.getElementById('stockMessage');
+            const submitBtn = event.target;
+            
+            if (!quantity || quantity <= 0) {
+                messageDiv.className = 'alert alert-danger';
+                messageDiv.textContent = 'Please enter a valid quantity greater than 0.';
+                messageDiv.classList.remove('d-none');
+                return;
+            }
+            
+            if (!Number.isInteger(quantity)) {
+                messageDiv.className = 'alert alert-danger';
+                messageDiv.textContent = 'Quantity must be a whole number.';
+                messageDiv.classList.remove('d-none');
+                return;
+            }
+            
+            // Disable button during request
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Adding...';
+            
+            const formData = new FormData();
+            formData.append('product_id', productId);
+            formData.append('quantity', quantity);
+            
+            fetch('add_stock.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    messageDiv.className = 'alert alert-success';
+                    messageDiv.textContent = data.message;
+                    messageDiv.classList.remove('d-none');
+                    
+                    // Update the page after 1.5 seconds
+                    setTimeout(() => {
+                        location.reload();
+                    }, 1500);
+                } else {
+                    messageDiv.className = 'alert alert-danger';
+                    messageDiv.textContent = data.message || 'Failed to add stock.';
+                    messageDiv.classList.remove('d-none');
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="fas fa-plus me-2"></i>Add Stock';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                messageDiv.className = 'alert alert-danger';
+                messageDiv.textContent = 'An error occurred. Please try again.';
+                messageDiv.classList.remove('d-none');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fas fa-plus me-2"></i>Add Stock';
             });
         }
     </script>

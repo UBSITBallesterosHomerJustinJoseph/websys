@@ -249,8 +249,6 @@ if ($is_logged_in) {
                                 <!-- Farmer-specific menu -->
                                 <li><a class="dropdown-item" href="<?php echo $profile_path; ?>"><i class="fas fa-user-circle me-2"></i>Profile</a></li>
                                 <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="<?php echo $orders_path; ?>"><i class="fas fa-shopping-cart me-2"></i>Orders</a></li>
-                                <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="<?php echo $farmer_dashboard_path; ?>"><i class="fas fa-tachometer-alt me-2"></i>Farmer Dashboard</a></li>
                                 <li><hr class="dropdown-divider"></li>
 

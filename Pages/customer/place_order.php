@@ -16,23 +16,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $phone = $_POST['phone'] ?? '';
     $pickupLocation = $_POST['pickup_location'] ?? '';
     $pickupDate = $_POST['pickup_date'] ?? '';
-    $pickupTime = $_POST['pickup_time'] ?? '';
     $paymentMethod = $_POST['payment_method'] ?? 'cod';
     $items = $_POST['items'] ?? [];
     $totalAmount = $_POST['total_amount'] ?? 0;
     
     // Validate required fields
     if (empty($fullname) || empty($email) || empty($phone) || empty($pickupLocation) || 
-        empty($pickupDate) || empty($pickupTime) || empty($items) || $totalAmount <= 0) {
+        empty($pickupDate) || empty($items) || $totalAmount <= 0) {
         $_SESSION['checkout_error'] = 'Please fill in all required fields.';
         header('Location: checkout.php');
         exit;
     }
     
-    // Build shipping address (pickup location + date/time)
+    // Build shipping address (pickup location + date)
     $shippingAddress = "Pickup at: " . ucfirst(str_replace('_', ' ', $pickupLocation)) . 
                        "\nDate: " . date('F d, Y', strtotime($pickupDate)) . 
-                       "\nTime: " . date('h:i A', strtotime($pickupTime));
+                       "\nNote: Seller will notify you when order is ready for pickup.";
     
     $orderNotes = "Customer: $fullname\nEmail: $email\nPhone: $phone";
     
@@ -68,90 +67,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 continue;
             }
             
-            // Find an available lot for this product
-            // Try to find a lot with available quantity >= requested quantity
-            $lotSql = "SELECT lot_id, available_quantity, selling_price 
-                       FROM inventory_lots 
-                       WHERE product_id = ? 
-                         AND status = 'available' 
-                         AND available_quantity >= ?
-                       ORDER BY expiry_date ASC, created_at ASC
-                       LIMIT 1";
-            $lotStmt = $farmcart->conn->prepare($lotSql);
-            $lotStmt->bind_param("id", $productId, $quantity);
-            $lotStmt->execute();
-            $lotResult = $lotStmt->get_result();
+            // Check product quantity and update it
+            $checkProductSql = "SELECT quantity, base_price, created_by FROM products WHERE product_id = ?";
+            $checkProductStmt = $farmcart->conn->prepare($checkProductSql);
+            $checkProductStmt->bind_param("i", $productId);
+            $checkProductStmt->execute();
+            $productResult = $checkProductStmt->get_result();
             
-            if ($lotResult->num_rows > 0) {
-                $lot = $lotResult->fetch_assoc();
-                $lotId = $lot['lot_id'];
-                $sellingPrice = $lot['selling_price'] ?? $unitPrice;
-            } else {
-                // If no lot found, try to find any available lot for this product (even with less quantity)
-                $lotSql2 = "SELECT lot_id, available_quantity, selling_price 
-                            FROM inventory_lots 
-                            WHERE product_id = ? 
-                              AND status = 'available' 
-                              AND available_quantity > 0
-                            ORDER BY expiry_date ASC, created_at ASC
-                            LIMIT 1";
-                $lotStmt2 = $farmcart->conn->prepare($lotSql2);
-                $lotStmt2->bind_param("i", $productId);
-                $lotStmt2->execute();
-                $lotResult2 = $lotStmt2->get_result();
-                
-                if ($lotResult2->num_rows > 0) {
-                    $lot = $lotResult2->fetch_assoc();
-                    $lotId = $lot['lot_id'];
-                    $sellingPrice = $lot['selling_price'] ?? $unitPrice;
-                    // Adjust quantity to available quantity if needed
-                    if ($lot['available_quantity'] < $quantity) {
-                        $quantity = $lot['available_quantity'];
-                    }
-            } else {
-                // No lot available - create a temporary lot automatically
-                // Get product and farmer info
-                $productSql = "SELECT p.base_price, p.created_by 
-                               FROM products p 
-                               WHERE p.product_id = ?";
-                $productStmt = $farmcart->conn->prepare($productSql);
-                $productStmt->bind_param("i", $productId);
-                $productStmt->execute();
-                $productResult = $productStmt->get_result();
-                
-                if ($productResult->num_rows > 0) {
-                    $product = $productResult->fetch_assoc();
-                    $farmerId = $product['created_by'] ?? $userId; // Use product creator as farmer
-                    $sellingPrice = $product['base_price'] ?? $unitPrice;
-                    
-                    // Create a temporary lot for this order
-                    $lotNumber = "TEMP_" . time() . "_" . $productId;
-                    $createLotSql = "INSERT INTO inventory_lots 
-                                     (product_id, farmer_id, lot_number, quantity, available_quantity, 
-                                      selling_price, status) 
-                                     VALUES (?, ?, ?, ?, ?, ?, 'available')";
-                    $createLotStmt = $farmcart->conn->prepare($createLotSql);
-                    $createLotStmt->bind_param("iisddd", $productId, $farmerId, $lotNumber, $quantity, $quantity, $sellingPrice);
-                    
-                    if ($createLotStmt->execute()) {
-                        $lotId = $farmcart->conn->insert_id;
-                        $orderNotes .= "\n\nNote: Auto-created lot for Product ID $productId (qty: $quantity).";
-                    } else {
-                        // If lot creation fails, skip this item
-                        $orderNotes .= "\n\nNote: Product ID $productId (qty: $quantity) - Could not create lot. Please contact farmer.";
-                        $productStmt->close();
-                        continue;
-                    }
-                    $createLotStmt->close();
-                } else {
-                    $productStmt->close();
+            if ($productResult->num_rows === 0) {
+                $checkProductStmt->close();
+                continue;
+            }
+            
+            $product = $productResult->fetch_assoc();
+            $availableQty = (int)($product['quantity'] ?? 0);
+            $sellingPrice = $product['base_price'] ?? $unitPrice;
+            $farmerId = $product['created_by'] ?? $userId;
+            
+            // Adjust quantity if needed
+            if ($availableQty < $quantity) {
+                $quantity = $availableQty;
+                if ($quantity <= 0) {
+                    $checkProductStmt->close();
                     continue;
                 }
-                $productStmt->close();
             }
-                $lotStmt2->close();
+            
+            // Create a lot for this order (for order_items table requirement)
+            $lotNumber = "ORDER_" . time() . "_" . $productId;
+            $createLotSql = "INSERT INTO inventory_lots 
+                             (product_id, farmer_id, lot_number, quantity, available_quantity, 
+                              selling_price, status) 
+                             VALUES (?, ?, ?, ?, ?, ?, 'available')";
+            $createLotStmt = $farmcart->conn->prepare($createLotSql);
+            $createLotStmt->bind_param("iisddd", $productId, $farmerId, $lotNumber, $quantity, $quantity, $sellingPrice);
+            
+            if (!$createLotStmt->execute()) {
+                $checkProductStmt->close();
+                continue;
             }
-            $lotStmt->close();
+            
+            $lotId = $farmcart->conn->insert_id;
+            $createLotStmt->close();
+            $checkProductStmt->close();
             
             // Calculate subtotal
             $subtotal = $sellingPrice * $quantity;
@@ -166,14 +124,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 throw new Exception("Failed to create order item: " . $itemStmt->error);
             }
             
-            // Update lot available quantity
-            $updateLotSql = "UPDATE inventory_lots 
-                             SET available_quantity = available_quantity - ? 
-                             WHERE lot_id = ?";
-            $updateLotStmt = $farmcart->conn->prepare($updateLotSql);
-            $updateLotStmt->bind_param("di", $quantity, $lotId);
-            $updateLotStmt->execute();
-            $updateLotStmt->close();
+            // Update product quantity
+            $updateProductSql = "UPDATE products SET quantity = quantity - ? WHERE product_id = ?";
+            $updateProductStmt = $farmcart->conn->prepare($updateProductSql);
+            $updateProductStmt->bind_param("ii", $quantity, $productId);
+            $updateProductStmt->execute();
+            $updateProductStmt->close();
             
             $itemStmt->close();
         }

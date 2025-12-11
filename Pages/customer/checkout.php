@@ -147,9 +147,9 @@ $total = $subtotal; // pickup only, no shipping fee
               <label class="form-label">Pickup Date</label>
               <input type="date" class="form-control" name="pickup_date" required>
             </div>
-            <div class="mb-3">
-              <label class="form-label">Pickup Time</label>
-              <input type="time" class="form-control" name="pickup_time" required>
+            <div class="alert alert-info">
+              <i class="fas fa-info-circle me-2"></i>
+              <strong>Note:</strong> The seller will notify you when your order is ready for pickup. You don't need to specify a time.
             </div>
           </div>
 

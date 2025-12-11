@@ -8,9 +8,9 @@ $items = [];
 $total = 0;
 
 if ($userId) {
-    // Logged-in users: fetch cart from DB
+    // Logged-in users: fetch cart from DB with available quantity
     $sql = "SELECT c.cart_id, c.product_id, p.product_name, c.quantity, p.base_price, p.unit_type,
-                   pi.image_url
+                   pi.image_url, p.quantity as available_quantity
             FROM carts c
             JOIN products p ON c.product_id = p.product_id
             LEFT JOIN product_images pi ON p.product_id = pi.product_id AND pi.is_primary = TRUE
@@ -31,9 +31,9 @@ if ($userId) {
     $guestCart = $_SESSION['guest_cart'] ?? [];
     foreach ($guestCart as $productId => $cartItem) {
         if (isset($cartItem['product_id'])) {
-            // Fetch product details for guest cart
+            // Fetch product details for guest cart with available quantity
             $sql = "SELECT p.product_id, p.product_name, p.base_price, p.unit_type,
-                           pi.image_url
+                           pi.image_url, p.quantity as available_quantity
                     FROM products p
                     LEFT JOIN product_images pi ON p.product_id = pi.product_id AND pi.is_primary = TRUE
                     WHERE p.product_id = ? AND p.approval_status = 'approved' AND p.is_listed = TRUE";
@@ -229,13 +229,17 @@ if ($userId) {
               <div class="cart-item-details">
                 <span class="cart-item-name"><?= htmlspecialchars($item['product_name']); ?></span>
                 <span class="cart-item-unit">Per <?= htmlspecialchars($item['unit_type'] ?? 'unit'); ?></span>
+                <span class="text-info small d-block mt-1">
+                  <i class="fas fa-box me-1"></i>
+                  Available: <?= number_format((int)($item['available_quantity'] ?? 0), 0); ?> <?= htmlspecialchars($item['unit_type'] ?? 'unit'); ?>
+                </span>
                 
                 <div class="cart-item-controls">
-                  <button class="qty-btn qty-decrease" onclick="updateQuantity(<?= htmlspecialchars($item['cart_id']); ?>, <?= htmlspecialchars($item['product_id']); ?>, -1)" title="Decrease quantity">
+                  <button class="qty-btn qty-decrease" onclick="updateQuantity(<?= htmlspecialchars($item['cart_id']); ?>, <?= htmlspecialchars($item['product_id']); ?>, -1, <?= $item['available_quantity'] ?? 0 ?>)" title="Decrease quantity">
                     <i class="fas fa-minus"></i>
                   </button>
                   <span class="cart-item-qty"><?= (int)$item['quantity']; ?></span>
-                  <button class="qty-btn qty-increase" onclick="updateQuantity(<?= htmlspecialchars($item['cart_id']); ?>, <?= htmlspecialchars($item['product_id']); ?>, 1)" title="Increase quantity">
+                  <button class="qty-btn qty-increase" onclick="updateQuantity(<?= htmlspecialchars($item['cart_id']); ?>, <?= htmlspecialchars($item['product_id']); ?>, 1, <?= $item['available_quantity'] ?? 0 ?>)" title="Increase quantity" <?= ($item['quantity'] >= ($item['available_quantity'] ?? 0)) ? 'disabled' : '' ?>>
                     <i class="fas fa-plus"></i>
                   </button>
                   <button class="btn-remove" onclick="removeFromCart(<?= htmlspecialchars($item['cart_id']); ?>, <?= htmlspecialchars($item['product_id']); ?>)" title="Remove item">
@@ -286,7 +290,7 @@ if ($userId) {
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   
   <script>
-    function updateQuantity(cartId, productId, change) {
+    function updateQuantity(cartId, productId, change, availableQty) {
       const cartItem = document.querySelector(`[data-cart-id="${cartId}"]`);
       const qtySpan = cartItem.querySelector('.cart-item-qty');
       const currentQty = parseInt(qtySpan.textContent);
@@ -294,6 +298,12 @@ if ($userId) {
       
       if (newQty < 1) {
         removeFromCart(cartId, productId);
+        return;
+      }
+      
+      // Check if new quantity exceeds available
+      if (newQty > availableQty) {
+        alert(`Cannot add more. Only ${availableQty} available.`);
         return;
       }
       

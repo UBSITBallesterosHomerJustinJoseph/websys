@@ -89,12 +89,6 @@ $total_users = isset($stats['users']) ? $stats['users'] : 0;
                 </a>
             </li>
 
-            <li class="nav-item mb-2">
-                <a class="nav-link admin-sidebar-link <?php echo ($current_page == 'reports.php') ? 'active' : ''; ?>" href="reports.php">
-                    <i class="fas fa-chart-bar me-2"></i>
-                    Reports & Analytics
-                </a>
-            </li>
 
             <li class="nav-item mb-2">
                 <a class="nav-link admin-sidebar-link <?php echo ($current_page == 'settings.php') ? 'active' : ''; ?>" href="settings.php">
@@ -129,15 +123,15 @@ $total_users = isset($stats['users']) ? $stats['users'] : 0;
             <div class="small text-light">
                 <div class="d-flex justify-content-between mb-2">
                     <span>Pending Reviews:</span>
-                    <strong><?= $pending_products ?></strong>
+                    <strong class="badge bg-warning text-dark"><?= $pending_products ?></strong>
                 </div>
                 <div class="d-flex justify-content-between mb-2">
                     <span>Farmers Pending:</span>
-                    <strong><?= $unverified_farmers ?></strong>
+                    <strong class="badge bg-warning text-dark"><?= $unverified_farmers ?></strong>
                 </div>
                 <div class="d-flex justify-content-between">
                     <span>Total Users:</span>
-                    <strong><?= $total_users ?></strong>
+                    <strong class="badge bg-info"><?= $total_users ?></strong>
                 </div>
             </div>
         </div>

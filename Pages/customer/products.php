@@ -48,7 +48,7 @@ $category_descriptions = [
 $display_name = $category_display_names[$category_name] ?? ($category_display_names[$category_type] ?? ucfirst($category_name));
 $description = $category_descriptions[$category_name] ?? ($category_descriptions[$category_type] ?? 'Discover our fresh farm products.');
 
-// Fetch approved products from database
+// Fetch approved products from database with quantity
 $products_query = "SELECT
                     p.product_id,
                     p.product_name,
@@ -56,6 +56,7 @@ $products_query = "SELECT
                     p.category_id,
                     p.unit_type,
                     p.base_price,
+                    p.quantity,
                     p.expires_at,
                     p.approval_status,
                     p.created_at,
@@ -245,6 +246,10 @@ if ($products_result) {
                                     <p class="text-muted small mb-2">
                                         <i class="fas fa-weight me-1"></i>Per <?= htmlspecialchars($product['unit_type']); ?>
                                     </p>
+                                    <p class="text-info small mb-2">
+                                        <i class="fas fa-box me-1"></i>
+                                        Available: <?= number_format($product['quantity'] ?? 0, 0); ?> <?= htmlspecialchars($product['unit_type']); ?>
+                                    </p>
 
                                     <p class="small mb-2 text-truncate-3">
                                         <?= nl2br(htmlspecialchars(substr($product['description'], 0, 150))); ?>
@@ -283,8 +288,11 @@ if ($products_result) {
                                                 <i class="fas fa-eye me-1"></i>View Image
                                             </button>
                                         <?php endif; ?>
-                                        <button class="btn btn-sm btn-success" onclick="addToCart(<?= $product['product_id'] ?>, event)">
-                                            <i class="fas fa-cart-plus me-1"></i>Add to Cart
+                                        <button class="btn btn-sm btn-success" 
+                                                onclick="addToCart(<?= $product['product_id'] ?>, <?= (int)($product['quantity'] ?? 0) ?>, event)"
+                                                <?= ($product['quantity'] ?? 0) <= 0 ? 'disabled title="Out of stock"' : '' ?>>
+                                            <i class="fas fa-cart-plus me-1"></i>
+                                            <?= ($product['quantity'] ?? 0) <= 0 ? 'Out of Stock' : 'Add to Cart' ?>
                                         </button>
                                     </div>
                                 </div>
@@ -400,7 +408,7 @@ if ($products_result) {
         }
 
         // Add to Cart Function
-        function addToCart(productId, evt) {
+        function addToCart(productId, availableQuantity, evt) {
             // Get the button that was clicked
             const btn = evt ? evt.target.closest('button') : (window.event ? window.event.target.closest('button') : null);
             if (!btn) {
@@ -417,10 +425,19 @@ if ($products_result) {
             btn.disabled = true;
             btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Adding...';
             
+            // Check available quantity
+            if (availableQuantity <= 0) {
+                alert('This product is currently out of stock.');
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+                return;
+            }
+
             // Send AJAX request
             const formData = new FormData();
             formData.append('product_id', productId);
             formData.append('quantity', 1);
+            formData.append('available_quantity', availableQuantity);
             
             fetch('add_to_cart.php', {
                 method: 'POST',
