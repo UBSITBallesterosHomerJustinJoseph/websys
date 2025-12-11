@@ -113,11 +113,32 @@ if (isset($_GET['verify_farmer'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_category'])) {
     $category_name = $farmcart->conn->real_escape_string($_POST['category_name']);
     $category_type = $farmcart->conn->real_escape_string($_POST['category_type']);
-    $description = $farmcart->conn->real_escape_string($_POST['description']);
+    $description = $farmcart->conn->real_escape_string($_POST['description'] ?? '');
+    $image_url = '';
 
-    $stmt = $farmcart->conn->prepare("INSERT INTO categories (category_name, category_type, description, is_active) VALUES (?, ?, ?, 1)");
+    // Handle image upload
+    if (isset($_FILES['category_image']) && $_FILES['category_image']['error'] === UPLOAD_ERR_OK) {
+        $upload_dir = '../../Assets/images/categories/';
+        if (!file_exists($upload_dir)) {
+            mkdir($upload_dir, 0777, true);
+        }
+
+        $file_extension = strtolower(pathinfo($_FILES['category_image']['name'], PATHINFO_EXTENSION));
+        $allowed_extensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+        
+        if (in_array($file_extension, $allowed_extensions)) {
+            $file_name = 'category_' . time() . '_' . uniqid() . '.' . $file_extension;
+            $file_path = $upload_dir . $file_name;
+            
+            if (move_uploaded_file($_FILES['category_image']['tmp_name'], $file_path)) {
+                $image_url = 'Assets/images/categories/' . $file_name;
+            }
+        }
+    }
+
+    $stmt = $farmcart->conn->prepare("INSERT INTO categories (category_name, category_type, description, image_url, is_active) VALUES (?, ?, ?, ?, 1)");
     if ($stmt) {
-        $stmt->bind_param("sss", $category_name, $category_type, $description);
+        $stmt->bind_param("ssss", $category_name, $category_type, $description, $image_url);
         $stmt->execute();
         $stmt->close();
 
@@ -127,6 +148,147 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_category'])) {
         header("Location: index.php?tab=categories");
         exit();
     }
+}
+
+// Handle category update
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_category'])) {
+    $category_id = intval($_POST['category_id']);
+    $category_name = $farmcart->conn->real_escape_string($_POST['category_name']);
+    $category_type = $farmcart->conn->real_escape_string($_POST['category_type']);
+    $description = $farmcart->conn->real_escape_string($_POST['description'] ?? '');
+    $is_active = isset($_POST['is_active']) ? 1 : 0;
+
+    // Get current image URL
+    $current_image_query = $farmcart->conn->prepare("SELECT image_url FROM categories WHERE category_id = ?");
+    $current_image_query->bind_param("i", $category_id);
+    $current_image_query->execute();
+    $current_image_result = $current_image_query->get_result();
+    $current_image = $current_image_result->fetch_assoc()['image_url'] ?? '';
+    $current_image_query->close();
+
+    // Check if image should be deleted
+    if (isset($_POST['delete_image']) && $_POST['delete_image'] == '1') {
+        // Delete old image if exists
+        if (!empty($current_image) && file_exists('../../' . $current_image)) {
+            @unlink('../../' . $current_image);
+        }
+        $image_url = '';
+    } else {
+        $image_url = $current_image;
+    }
+
+    // Handle image upload if new image is provided
+    if (isset($_FILES['category_image']) && $_FILES['category_image']['error'] === UPLOAD_ERR_OK) {
+        $upload_dir = '../../Assets/images/categories/';
+        if (!file_exists($upload_dir)) {
+            mkdir($upload_dir, 0777, true);
+        }
+
+        $file_extension = strtolower(pathinfo($_FILES['category_image']['name'], PATHINFO_EXTENSION));
+        $allowed_extensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+        
+        if (in_array($file_extension, $allowed_extensions)) {
+            // Delete old image if exists
+            if (!empty($current_image) && file_exists('../../' . $current_image)) {
+                @unlink('../../' . $current_image);
+            }
+
+            $file_name = 'category_' . time() . '_' . uniqid() . '.' . $file_extension;
+            $file_path = $upload_dir . $file_name;
+            
+            if (move_uploaded_file($_FILES['category_image']['tmp_name'], $file_path)) {
+                $image_url = 'Assets/images/categories/' . $file_name;
+            }
+        }
+    }
+
+    $stmt = $farmcart->conn->prepare("UPDATE categories SET category_name = ?, category_type = ?, description = ?, image_url = ?, is_active = ? WHERE category_id = ?");
+    if ($stmt) {
+        $stmt->bind_param("ssssii", $category_name, $category_type, $description, $image_url, $is_active, $category_id);
+        $stmt->execute();
+        $stmt->close();
+
+        header("Location: index.php?tab=categories");
+        exit();
+    }
+}
+
+// Handle category image deletion
+if (isset($_GET['delete_category_image'])) {
+    $category_id = intval($_GET['delete_category_image']);
+    
+    // Get image URL before deletion
+    $image_query = $farmcart->conn->prepare("SELECT image_url FROM categories WHERE category_id = ?");
+    $image_query->bind_param("i", $category_id);
+    $image_query->execute();
+    $image_result = $image_query->get_result();
+    if ($image_result->num_rows > 0) {
+        $image_data = $image_result->fetch_assoc();
+        $image_path = '../../' . $image_data['image_url'];
+        if (!empty($image_data['image_url']) && file_exists($image_path)) {
+            @unlink($image_path);
+        }
+        
+        // Update category to remove image URL
+        $update_stmt = $farmcart->conn->prepare("UPDATE categories SET image_url = '' WHERE category_id = ?");
+        $update_stmt->bind_param("i", $category_id);
+        $update_stmt->execute();
+        $update_stmt->close();
+    }
+    $image_query->close();
+
+    header("Location: index.php?tab=categories");
+    exit();
+}
+
+// Handle category deletion
+if (isset($_GET['delete_category'])) {
+    $category_id = intval($_GET['delete_category']);
+    
+    // Check if category has associated products
+    $products_check = $farmcart->conn->prepare("SELECT COUNT(*) as product_count FROM products WHERE category_id = ?");
+    $products_check->bind_param("i", $category_id);
+    $products_check->execute();
+    $products_result = $products_check->get_result();
+    $product_count = $products_result->fetch_assoc()['product_count'] ?? 0;
+    $products_check->close();
+    
+    if ($product_count > 0) {
+        $_SESSION['admin_error'] = "Cannot delete category. There are {$product_count} product(s) associated with this category. Please remove or reassign products first.";
+        header("Location: index.php?tab=categories");
+        exit();
+    }
+    
+    // Get image URL before deletion
+    $image_query = $farmcart->conn->prepare("SELECT image_url FROM categories WHERE category_id = ?");
+    $image_query->bind_param("i", $category_id);
+    $image_query->execute();
+    $image_result = $image_query->get_result();
+    if ($image_result->num_rows > 0) {
+        $image_data = $image_result->fetch_assoc();
+        $image_path = '../../' . $image_data['image_url'];
+        if (!empty($image_data['image_url']) && file_exists($image_path)) {
+            @unlink($image_path);
+        }
+    }
+    $image_query->close();
+
+    // Delete category
+    $stmt = $farmcart->conn->prepare("DELETE FROM categories WHERE category_id = ?");
+    if ($stmt) {
+        $stmt->bind_param("i", $category_id);
+        if ($stmt->execute()) {
+            $_SESSION['admin_success'] = "Category deleted successfully!";
+        } else {
+            $_SESSION['admin_error'] = "Error deleting category: " . $stmt->error;
+        }
+        $stmt->close();
+    } else {
+        $_SESSION['admin_error'] = "Error preparing delete statement.";
+    }
+
+    header("Location: index.php?tab=categories");
+    exit();
 }
 
 // Helper function to add notifications
@@ -284,6 +446,9 @@ $categories = $farmcart->conn->query("SELECT * FROM categories ORDER BY category
 if (!$categories) {
     echo "Error in categories query: " . $farmcart->conn->error;
     $categories = false;
+} else {
+    // Reset pointer for use in partial
+    $categories->data_seek(0);
 }
 
 // Fetch all users

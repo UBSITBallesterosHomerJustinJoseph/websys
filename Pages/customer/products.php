@@ -1,11 +1,8 @@
 <?php
 include '../../db_connect.php';
 
-// Check if user is logged in
-if (!isset($_SESSION['user_id'])) {
-    header("location: ../index.php");
-    exit();
-}
+// Check if user is logged in (but don't require it for browsing)
+$is_logged_in = isset($_SESSION['user_id']) && !empty($_SESSION['user_id']);
 
 // Get category from URL
 $category_name = $_GET['category'] ?? '';
@@ -26,6 +23,7 @@ $category_type = $category_mapping[$category_name] ?? $category_type;
 
 // Get category display name and description
 $category_display_names = [
+    'all' => 'All Products',
     'vegetables' => 'Fresh Vegetables',
     'fruits' => 'Fresh Fruits',
     'poultry' => 'Farm Eggs & Poultry',
@@ -35,6 +33,7 @@ $category_display_names = [
 ];
 
 $category_descriptions = [
+    'all' => 'Browse all available farm-fresh products from local farmers.',
     'vegetables' => 'Fresh, seasonal organic vegetables from local farms. Harvested at peak freshness for maximum flavor and nutrition.',
     'fruits' => 'Sweet and juicy seasonal fruits grown with care. Perfect for snacking, desserts, and healthy eating.',
     'poultry' => 'Free-range eggs and humanely raised poultry. No antibiotics or hormones, just natural goodness.',
@@ -43,10 +42,61 @@ $category_descriptions = [
     'herbs' => '100% natural raw honey and fresh herbs. Pure, unprocessed, and full of natural goodness.'
 ];
 
-$display_name = $category_display_names[$category_type] ?? ucfirst($category_name);
-$description = $category_descriptions[$category_type] ?? 'Discover our fresh farm products.';
+$display_name = $category_display_names[$category_name] ?? ($category_display_names[$category_type] ?? ucfirst($category_name));
+$description = $category_descriptions[$category_name] ?? ($category_descriptions[$category_type] ?? 'Discover our fresh farm products.');
 
-$products = $sample_products[$category_type] ?? [];
+// Fetch approved products from database
+$products_query = "SELECT
+                    p.product_id,
+                    p.product_name,
+                    p.description,
+                    p.category_id,
+                    p.unit_type,
+                    p.base_price,
+                    p.expires_at,
+                    p.approval_status,
+                    p.created_at,
+                    c.category_name,
+                    c.category_type,
+                    pi.image_url,
+                    u.first_name as farmer_first,
+                    u.last_name as farmer_last,
+                    fp.farm_name
+                 FROM products p
+                 LEFT JOIN categories c ON p.category_id = c.category_id
+                 LEFT JOIN product_images pi ON p.product_id = pi.product_id AND pi.is_primary = TRUE
+                 LEFT JOIN users u ON p.created_by = u.user_id
+                 LEFT JOIN farmer_profiles fp ON p.created_by = fp.user_id
+                 WHERE p.approval_status = 'approved'
+                   AND p.is_listed = TRUE
+                   AND (p.is_expired IS NULL OR p.is_expired = 0)
+                   AND (p.expires_at IS NULL OR p.expires_at > NOW())";
+
+// Filter by category if not 'all'
+$stmt = null;
+if ($category_name !== 'all' && !empty($category_type)) {
+    $products_query .= " AND c.category_type = ?";
+    $stmt = $farmcart->conn->prepare($products_query);
+    if ($stmt) {
+        $stmt->bind_param("s", $category_type);
+        $stmt->execute();
+        $products_result = $stmt->get_result();
+    } else {
+        $products_result = false;
+    }
+} else {
+    $products_result = $farmcart->conn->query($products_query);
+}
+
+$products = [];
+if ($products_result) {
+    while ($row = $products_result->fetch_assoc()) {
+        $products[] = $row;
+    }
+    if ($stmt) {
+        $stmt->close();
+    }
+}
 ?>
 
 <!DOCTYPE html>
@@ -60,6 +110,8 @@ $products = $sample_products[$category_type] ?? [];
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Remix Icon -->
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
     <!-- CSS -->
     <link rel="stylesheet" href="../../Assets/css/navbar.css">
     <link rel="stylesheet" href="../../Assets/css/customer.css">
@@ -77,6 +129,7 @@ $products = $sample_products[$category_type] ?? [];
                 <div class="category-icon-large">
                     <?php
                     $category_icons = [
+                        'all' => '🛒',
                         'vegetables' => '🥦',
                         'fruits' => '🍎',
                         'poultry' => '🥚',
@@ -84,7 +137,7 @@ $products = $sample_products[$category_type] ?? [];
                         'livestock' => '🐄',
                         'herbs' => '🍯'
                     ];
-                    echo $category_icons[$category_type] ?? '📦';
+                    echo $category_icons[$category_name] ?? ($category_icons[$category_type] ?? '📦');
                     ?>
                 </div>
                 <h1 class="category-title"><?php echo $display_name; ?></h1>
@@ -96,7 +149,10 @@ $products = $sample_products[$category_type] ?? [];
                         <span class="stat-label">Products</span>
                     </div>
                     <div class="stat">
-                        <span class="stat-number">15+</span>
+                        <span class="stat-number"><?php 
+                            $farmers_count = $farmcart->conn->query("SELECT COUNT(DISTINCT created_by) as count FROM products WHERE approval_status = 'approved' AND is_listed = TRUE AND (is_expired IS NULL OR is_expired = 0)");
+                            echo $farmers_count ? $farmers_count->fetch_assoc()['count'] : 0;
+                        ?>+</span>
                         <span class="stat-label">Local Farms</span>
                     </div>
                     <div class="stat">
@@ -111,12 +167,21 @@ $products = $sample_products[$category_type] ?? [];
     <!-- Products Grid -->
     <section class="products-listing">
         <div class="container">
+            <?php if (!$is_logged_in): ?>
+                <div class="alert alert-info alert-dismissible fade show" role="alert" style="margin-bottom: 2rem; border-left: 4px solid #0F2E15;">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Browse freely!</strong> You can view all products, but you'll need to 
+                    <a href="/websys/Register/login.php?redirect=<?php echo urlencode($_SERVER['REQUEST_URI']); ?>" class="alert-link fw-bold">log in</a> 
+                    to add items to your cart and make purchases.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            <?php endif; ?>
             <!-- Filters and Sorting -->
             <div class="products-header">
                 <div class="row align-items-center">
                     <div class="col-md-6">
                         <h2 class="section-title">Available Products</h2>
-                        <p class="text-muted">Showing <?php echo count($products); ?> products</p>
+                        <p class="text-muted">Showing <?php echo count($products); ?> product<?php echo count($products) != 1 ? 's' : ''; ?></p>
                     </div>
                     <div class="col-md-6 text-end">
                         <div class="sorting-options">
@@ -133,76 +198,106 @@ $products = $sample_products[$category_type] ?? [];
             </div>
 
             <!-- Products Grid -->
-            <div class="products-grid">
+            <div class="row g-4">
                 <?php if (!empty($products)): ?>
                     <?php foreach ($products as $product): ?>
-                    <div class="product-card">
-                        <div class="product-image">
-                            <span class="product-emoji"><?php echo $product['image']; ?></span>
-                            <div class="product-actions">
-                                <button class="btn-wishlist" title="Add to Wishlist">
-                                    <i class="far fa-heart"></i>
-                                </button>
-                            </div>
-                        </div>
+                        <?php
+                        $farmer_name = htmlspecialchars($product['farmer_first'] . ' ' . $product['farmer_last']);
+                        $farm_name = !empty($product['farm_name']) ? htmlspecialchars($product['farm_name']) : 'No farm name';
+                        
+                        // Fix image path
+                        $image_url = !empty($product['image_url']) ? $product['image_url'] : '';
+                        if (!empty($image_url) && !preg_match('/^https?:\/\//', $image_url)) {
+                            if (strpos($image_url, 'uploads/') === 0) {
+                                $image_url = '../farmer/' . $image_url;
+                            }
+                        }
+                        
+                        $expires_at = !empty($product['expires_at']) ? date('M d, Y h:i A', strtotime($product['expires_at'])) : 'No expiry set';
+                        ?>
+                        <div class="col-md-4 col-lg-3">
+                            <div class="card product-card">
+                                <?php if (!empty($image_url)): ?>
+                                    <img src="<?= htmlspecialchars($image_url); ?>" 
+                                         class="card-img-top" 
+                                         alt="<?= htmlspecialchars($product['product_name']); ?>" 
+                                         style="height: 200px; object-fit: cover;" 
+                                         onerror="this.src='https://via.placeholder.com/300x220?text=No+Image'">
+                                <?php else: ?>
+                                    <div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height: 200px;">
+                                        <i class="fas fa-seedling fa-3x text-muted"></i>
+                                    </div>
+                                <?php endif; ?>
 
-                        <div class="product-content">
-                            <div class="product-rating">
-                                <span class="stars">
-                                    <?php
-                                    $rating = $product['rating'];
-                                    $fullStars = floor($rating);
-                                    $halfStar = ($rating - $fullStars) >= 0.5;
+                                <div class="card-body">
+                                    <h5 class="card-title"><?= htmlspecialchars($product['product_name']); ?></h5>
 
-                                    for ($i = 1; $i <= 5; $i++) {
-                                        if ($i <= $fullStars) {
-                                            echo '<i class="fas fa-star"></i>';
-                                        } elseif ($halfStar && $i == $fullStars + 1) {
-                                            echo '<i class="fas fa-star-half-alt"></i>';
-                                        } else {
-                                            echo '<i class="far fa-star"></i>';
-                                        }
-                                    }
-                                    ?>
-                                </span>
-                                <span class="rating-value"><?php echo $rating; ?></span>
-                            </div>
+                                    <p class="text-muted mb-1">
+                                        <i class="fas fa-user me-1"></i>
+                                        <?= $farmer_name ?>
+                                    </p>
 
-                            <h3 class="product-title"><?php echo $product['name']; ?></h3>
-                            <p class="product-farmer">
-                                <i class="fas fa-tractor me-1"></i>
-                                <?php echo $product['farmer']; ?>
-                            </p>
+                                    <p class="text-muted mb-1">
+                                        <i class="fas fa-tractor me-1"></i>
+                                        <?= $farm_name ?>
+                                    </p>
 
-                            <div class="product-price">
-                                <span class="price">₱<?php echo number_format($product['price'], 2); ?></span>
-                                <span class="unit">/<?php echo $product['unit']; ?></span>
-                            </div>
+                                    <p class="text-muted mb-1">
+                                        <i class="fas fa-tag me-1"></i>
+                                        <?= htmlspecialchars($product['category_name']); ?> (<?= htmlspecialchars($product['category_type']); ?>)
+                                    </p>
 
-                            <div class="product-meta">
-                                <span class="meta-item">
-                                    <i class="fas fa-shipping-fast"></i>
-                                    Free Delivery
-                                </span>
-                                <span class="meta-item">
-                                    <i class="fas fa-check-circle"></i>
-                                    In Stock
-                                </span>
-                            </div>
+                                    <p class="mb-2">
+                                        <strong class="text-success fs-5">₱<?= number_format($product['base_price'], 2); ?></strong>
+                                    </p>
+                                    <p class="text-muted small mb-2">
+                                        <i class="fas fa-weight me-1"></i>Per <?= htmlspecialchars($product['unit_type']); ?>
+                                    </p>
 
-                            <div class="product-actions-bottom">
-                                <div class="quantity-selector">
-                                    <button class="quantity-btn minus">-</button>
-                                    <input type="number" class="quantity-input" value="1" min="1" max="10">
-                                    <button class="quantity-btn plus">+</button>
+                                    <p class="small mb-2 text-truncate-3">
+                                        <?= nl2br(htmlspecialchars(substr($product['description'], 0, 150))); ?>
+                                        <?= strlen($product['description']) > 150 ? '...' : ''; ?>
+                                    </p>
+                                    
+                                    <?php if ($expires_at !== 'No expiry set'): ?>
+                                        <p class="card-text small text-muted">
+                                            <i class="fas fa-hourglass-half me-1"></i>
+                                            Expires: <?= $expires_at ?>
+                                        </p>
+                                    <?php endif; ?>
                                 </div>
-                                <button class="btn-add-to-cart" data-product-id="<?php echo $product['id']; ?>">
-                                    <i class="fas fa-cart-plus"></i>
-                                    Add to Cart
-                                </button>
+
+                                <div class="card-footer bg-white border-top-0 pt-0">
+                                    <div class="action-buttons d-flex flex-wrap gap-2">
+                                        <button type="button" 
+                                                class="btn btn-sm btn-outline-secondary" 
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#productDetailsModal" 
+                                                data-product='<?= json_encode([
+                                                    'name' => $product['product_name'],
+                                                    'category' => $product['category_name'],
+                                                    'category_type' => $product['category_type'],
+                                                    'unit' => $product['unit_type'],
+                                                    'price' => number_format($product['base_price'], 2),
+                                                    'description' => $product['description'],
+                                                    'expires_at' => $expires_at,
+                                                ], JSON_HEX_APOS | JSON_HEX_QUOT); ?>'>
+                                            <i class="fas fa-list me-1"></i>Details
+                                        </button>
+                                        <?php if (!empty($image_url)): ?>
+                                            <button type="button" 
+                                                    class="btn btn-sm btn-outline-primary" 
+                                                    onclick="viewImage('<?= htmlspecialchars($image_url, ENT_QUOTES) ?>', '<?= htmlspecialchars($product['product_name'], ENT_QUOTES) ?>')">
+                                                <i class="fas fa-eye me-1"></i>View Image
+                                            </button>
+                                        <?php endif; ?>
+                                        <button class="btn btn-sm btn-success" onclick="addToCart(<?= $product['product_id'] ?>)">
+                                            <i class="fas fa-cart-plus me-1"></i>Add to Cart
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    </div>
                     <?php endforeach; ?>
                 <?php else: ?>
                     <div class="no-products">
@@ -218,6 +313,87 @@ $products = $sample_products[$category_type] ?? [];
             </div>
         </div>
     </section>
+
+    <!-- Featured Farmers Section -->
+    <section class="featured-farmers">
+        <div class="container">
+            <h2 class="section-title text-center">Featured Farmers</h2>
+            <p class="section-subtitle text-center">Meet the local farmers behind these amazing products</p>
+
+            <div class="farmers-grid">
+                <div class="farmer-card">
+                    <div class="farmer-avatar">
+                        <span>🚜</span>
+                    </div>
+                    <h4>Green Valley Farm</h4>
+                    <p>Specializing in organic vegetables since 2010</p>
+                    <div class="farmer-rating">
+                        <i class="fas fa-star"></i>
+                        <span>4.8 (120 reviews)</span>
+                    </div>
+                </div>
+
+                <div class="farmer-card">
+                    <div class="farmer-avatar">
+                        <span>🌞</span>
+                    </div>
+                    <h4>Sunshine Farm</h4>
+                    <p>Fresh fruits and free-range poultry</p>
+                    <div class="farmer-rating">
+                        <i class="fas fa-star"></i>
+                        <span>4.9 (95 reviews)</span>
+                    </div>
+                </div>
+
+                <div class="farmer-card">
+                    <div class="farmer-avatar">
+                        <span>🏔️</span>
+                    </div>
+                    <h4>Mountain View Farm</h4>
+                    <p>Grass-fed livestock and dairy products</p>
+                    <div class="farmer-rating">
+                        <i class="fas fa-star"></i>
+                        <span>4.7 (80 reviews)</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Product Details Modal -->
+    <div class="modal fade" id="productDetailsModal" tabindex="-1" aria-labelledby="productDetailsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="productDetailsModalLabel">Product Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="productDetailsContent">
+                        <!-- Content will be populated by JavaScript -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Image View Modal -->
+    <div class="modal fade" id="imageModal" tabindex="-1" aria-labelledby="imageModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="imageModalLabel">Product Image</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <img id="modalImage" src="" alt="Product Image" class="img-fluid rounded">
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
@@ -258,6 +434,84 @@ $products = $sample_products[$category_type] ?? [];
             });
         });
 
+        // View Image Function
+        function viewImage(imageUrl, productName) {
+            document.getElementById('modalImage').src = imageUrl;
+            document.getElementById('imageModalLabel').textContent = productName;
+            const modal = new bootstrap.Modal(document.getElementById('imageModal'));
+            modal.show();
+        }
+
+        // Add to Cart Function
+        function addToCart(productId) {
+            <?php if (!$is_logged_in): ?>
+                // User is not logged in, redirect to login page
+                const returnUrl = encodeURIComponent(window.location.href);
+                window.location.href = '/websys/Register/login.php?redirect=' + returnUrl;
+                return;
+            <?php endif; ?>
+            
+            // User is logged in, proceed with adding to cart
+            const quantity = prompt('Enter quantity:', '1');
+            if (quantity && !isNaN(quantity) && parseInt(quantity) > 0) {
+                // Send AJAX request to add to cart
+                fetch('/websys/Pages/customer/add_to_cart.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: 'product_id=' + productId + '&quantity=' + quantity
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(data.message || 'Product added to cart!');
+                        // Optionally refresh the page or update cart count
+                        console.log('Added product ' + productId + ' to cart');
+                    } else {
+                        if (data.redirect) {
+                            window.location.href = data.redirect;
+                        } else {
+                            alert(data.message || 'Error adding product to cart.');
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error adding product to cart. Please try again.');
+                });
+            }
+        }
+
+        // Product Details Modal
+        const productDetailsModal = document.getElementById('productDetailsModal');
+        if (productDetailsModal) {
+            productDetailsModal.addEventListener('show.bs.modal', function(event) {
+                const button = event.relatedTarget;
+                const productData = JSON.parse(button.getAttribute('data-product'));
+                const modalTitle = productDetailsModal.querySelector('.modal-title');
+                const modalBody = productDetailsModal.querySelector('#productDetailsContent');
+
+                modalTitle.textContent = productData.name;
+
+                modalBody.innerHTML = `
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="fw-bold">Product Information</h6>
+                            <p><strong>Name:</strong> ${productData.name}</p>
+                            <p><strong>Category:</strong> ${productData.category} (${productData.category_type})</p>
+                            <p><strong>Unit:</strong> ${productData.unit}</p>
+                            <p><strong>Price:</strong> ₱${productData.price}</p>
+                            <p><strong>Expires:</strong> ${productData.expires_at}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="fw-bold">Description</h6>
+                            <p>${productData.description.replace(/\n/g, '<br>')}</p>
+                        </div>
+                    </div>
+                `;
+            });
+        }
     </script>
 </body>
 </html>

@@ -1,0 +1,133 @@
+:root {
+  --primary-green: #4E653D;
+  --light-green: #6B8E4E;
+  --dark-green: #3A4D2E;
+  --accent-gold: #D4AF37;
+  --light-bg: #f4f6f2; /* softer neutral background */
+  --card-bg: #ffffffee; /* semi-transparent card */
+  --text-dark: #080f1d;
+  --text-light: #718096;
+  --border-light: #E2E8F0;
+  --shadow-sm: 0 2px 6px rgba(0,0,0,0.08);
+  --shadow-md: 0 8px 20px rgba(0,0,0,0.12);
+}
+body {
+  background: linear-gradient(135deg, #f0f4f1, #e6ebd9);
+  font-family: 'Inter', sans-serif;
+  color: #080f1d;
+}
+
+.orders-container {
+  background: rgba(255,255,255,0.92);
+  border-radius: 18px;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+  padding: 30px;
+  margin: 0 auto;
+}
+
+.orders-title {
+  text-align: center;
+  color: #4E653D;
+  font-weight: 700;
+  font-size: 2.2rem;
+  margin-bottom: 30px;
+}
+.orders-title::after {
+  content: "";
+  display: block;
+  width: 60px;
+  height: 4px;
+  background: #D4AF37;
+  margin: 10px auto 0;
+  border-radius: 2px;
+}
+
+.order-card {
+  background: #ffffffee;
+  border-radius: 16px;
+  padding: 25px;
+  margin-bottom: 25px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.order-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+}
+.order-card h4 {
+  color: #3A4D2E;
+  font-weight: 600;
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+.timeline {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 25px;
+  position: relative;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.timeline::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 5%;
+  right: 5%;
+  height: 4px;
+  background: #E2E8F0;
+  z-index: 0;
+}
+
+.timeline-step {
+  text-align: center;
+  flex: 1;
+  position: relative;
+  z-index: 1;
+}
+.timeline-step .circle {
+  display: inline-block;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #E2E8F0;
+  color: #718096;
+  line-height: 38px;
+  font-weight: 700;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+}
+.timeline-step.active .circle {
+  background: #D4AF37;
+  color: #3A4D2E;
+  box-shadow: 0 0 0 4px rgba(212,175,55,0.25);
+}
+.timeline-step .label {
+  display: block;
+  margin-top: 8px;
+  font-size: 0.9rem;
+  color: #718096;
+}
+.timeline-step.active .label {
+  color: #3A4D2E;
+  font-weight: 600;
+}
+
+.orders-empty h3 {
+  color: #4E653D;
+  font-weight: 600;
+}
+.btn-shop {
+  margin-top: 15px;
+  background-color: #D4AF37;
+  color: #1e3611;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-weight: 600;
+}
+.btn-shop:hover {
+  background: #c19b2a;
+  color: #fff;
+}

@@ -140,18 +140,6 @@
                     </div>
                 </div>
                 
-                <!-- Payment Methods -->
-                <div class="payment-methods">
-                    <h4>We Accept</h4>
-                    <div class="payment-icons">
-                        <i class="ri-visa-line"></i>
-                        <i class="ri-mastercard-line"></i>
-                        <i class="ri-paypal-line"></i>
-                        <i class="ri-apple-pay-line"></i>
-                        <i class="ri-google-pay-line"></i>
-                        <i class="ri-bit-coin-line"></i>
-                    </div>
-                </div>
             </div>
         </div>
 
@@ -166,9 +154,6 @@
                     <a href="#">Privacy Policy</a>
                     <a href="#">Terms of Service</a>
                     <a href="#">Cookie Policy</a>
-                    <a href="#">Shipping Policy</a>
-                    <a href="#">Return Policy</a>
-                    <a href="#">Sitemap</a>
                 </div>
                 
                 <div class="app-badges">

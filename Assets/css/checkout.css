@@ -1,0 +1,129 @@
+.checkout-container {
+  max-width: 1100px;
+  margin: 40px auto;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.92); /* softer white with transparency */
+  border-radius: 18px;
+  box-shadow: var(--shadow-md);
+}
+
+/* Page background */
+body {
+  background: linear-gradient(135deg, #f0f4f1, #e6ebd9); /* soft greenish gradient */
+  font-family: 'Inter', sans-serif;
+  color: var(--text-dark);
+}
+
+/* Optional subtle texture effect */
+body::before {
+  content: "";
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(circle at top left, rgba(212,175,55,0.08), transparent 70%),
+              radial-gradient(circle at bottom right, rgba(78,101,61,0.08), transparent 70%);
+  z-index: -1;
+}
+
+.checkout-title {
+  text-align: center;
+  color: var(--primary-green);
+  font-weight: 700;
+  font-size: 2.5rem;
+  margin-bottom: 30px;
+}
+
+.checkout-card {
+  background: var(--white);
+  border-radius: 14px;
+  padding: 25px;
+  margin-bottom: 20px;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.checkout-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md);
+}
+
+.checkout-card h3 {
+  font-size: 1.3rem;
+  color: var(--dark-green);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.form-instructions {
+  font-size: 0.9rem;
+  color: var(--text-light);
+  margin-bottom: 15px;
+  background: rgba(212,175,55,0.08);
+  padding: 8px 12px;
+  border-left: 3px solid var(--accent-gold);
+  border-radius: 6px;
+}
+
+.form-control, .form-select {
+  border-radius: 10px;
+  padding: 12px;
+  border: 1px solid var(--border-light);
+  transition: all 0.3s ease;
+}
+.form-control:focus, .form-select:focus {
+  border-color: var(--accent-gold);
+  box-shadow: 0 0 0 3px rgba(212,175,55,0.25);
+}
+
+.btn-place-order {
+  background-color: #D4AF37; /* solid gold tone */
+  border: none;
+  color: #1e3611; /* deep green text for contrast */
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 14px 35px;
+  margin-top: 20px;
+  width: 100%;
+  font-size: 1.1rem;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.15); /* subtle shadow */
+}
+
+
+/* Press animation */
+.btn-place-order:active {
+  transform: scale(0.96);
+}
+
+/* Pulse animation to draw attention */
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(212,175,55,0.6); }
+  70% { box-shadow: 0 0 0 15px rgba(212,175,55,0); }
+  100% { box-shadow: 0 0 0 0 rgba(212,175,55,0); }
+}
+.btn-place-order {
+  animation: pulse 2s infinite;
+}
+
+/* Shine effect across the button */
+.btn-place-order::after {
+  content: "";
+  position: absolute;
+  top: 0; left: -75%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(
+    120deg,
+    rgba(255,255,255,0.2) 0%,
+    rgba(255,255,255,0.6) 50%,
+    rgba(255,255,255,0.2) 100%
+  );
+  transform: skewX(-20deg);
+}
+.btn-place-order:active::after {
+  animation: shine 0.8s forwards;
+}
+@keyframes shine {
+  100% { left: 125%; }
+}

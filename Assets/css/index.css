@@ -28,7 +28,7 @@ body {
     content: '';
     position: absolute;
     inset: 0;
-    background: url('/websys/Assets/images/login_Image.jpg');
+    background: url('https://readdy.ai/api/search-image?query=Beautiful%20organic%20farm%20landscape%20with%20green%20fields%2C%20vegetable%20gardens%2C%20and%20fresh%20produce%20in%20foreground%2C%20golden%20hour%20lighting%2C%20natural%20countryside%20setting%2C%20peaceful%20agricultural%20scene%20with%20rolling%20hills&width=1920&height=1080&seq=hero001&orientation=landscape');
     background-size: cover;
     background-position: center top;
     z-index: -2;

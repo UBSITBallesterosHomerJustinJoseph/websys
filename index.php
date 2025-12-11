@@ -20,6 +20,16 @@ if (isset($_SESSION['user_id'])) {
     $user_role = $_SESSION['user_role'];
 }
 
+// Fetch categories for display
+$categories = [];
+$categories_query = "SELECT * FROM categories WHERE is_active = 1 ORDER BY category_name LIMIT 4";
+$categories_result = $farmcart->conn->query($categories_query);
+if ($categories_result && $categories_result->num_rows > 0) {
+    while ($row = $categories_result->fetch_assoc()) {
+        $categories[] = $row;
+    }
+}
+
 // Handle store creation (only if logged in)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_store'])) {
     if (!isset($_SESSION['user_id'])) {

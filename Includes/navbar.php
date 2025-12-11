@@ -315,6 +315,10 @@ $start_solid = $is_products_page || $is_about_page || $is_contact_page ||
         transition: transform 0.3s ease;
     }
     
+    .user-dropdown-btn .ml-auto {
+        margin-left: auto;
+    }
+    
     .user-dropdown-btn.active i {
         transform: rotate(180deg);
     }
@@ -492,6 +496,10 @@ $start_solid = $is_products_page || $is_about_page || $is_contact_page ||
         color: #0F2E15 !important;
     }
     
+    .setup-store-highlight .ri-sparkling-line {
+        color: #0F2E15 !important;
+    }
+    
     /* Additional styles for dropdown */
     .truncate {
         overflow: hidden;
@@ -511,6 +519,32 @@ $start_solid = $is_products_page || $is_about_page || $is_contact_page ||
     
     .logout-item i {
         color: #dc2626 !important;
+    }
+    
+    /* Nav actions container */
+    .nav-actions {
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+    }
+    
+    /* Sign In button */
+    .sign-in-btn {
+        background-color: #0F2E15;
+        color: white;
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 0.375rem;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 0.875rem;
+        transition: background-color 0.3s;
+        text-decoration: none;
+        display: inline-block;
+    }
+    
+    .sign-in-btn:hover {
+        background-color: #1a4a2a;
     }
     
     /* Animation for dropdown items */
@@ -636,9 +670,9 @@ $start_solid = $is_products_page || $is_about_page || $is_contact_page ||
                 </div>
             </form>
             
-            <div style="display: flex; gap: 1rem; align-items: center;">
+            <div class="nav-actions">
                 <?php if (!$is_logged_in): ?>
-                    <a href="<?php echo $register_path; ?>" style="background-color: #0F2E15; color: white; border: none; padding: 0.5rem 1rem; border-radius: 0.375rem; cursor: pointer; font-weight: 600; transition: background-color 0.3s; text-decoration: none;">Sign In</a>
+                    <a href="<?php echo $register_path; ?>" class="sign-in-btn">Sign Up</a>
                 <?php else: ?>
                     <div class="dropdown">
                         <?php
@@ -675,7 +709,7 @@ $start_solid = $is_products_page || $is_about_page || $is_contact_page ||
                                 type="button" id="userDropdown" onclick="toggleDropdown()">
                             <i class="ri-user-circle-line"></i> 
                             <span class="truncate"><?php echo htmlspecialchars($display_name); ?></span>
-                            <i class="ri-arrow-down-s-line ml-auto" style="margin-left: auto;"></i>
+                            <i class="ri-arrow-down-s-line ml-auto"></i>
                         </button>
                         
                         <div class="dropdown-menu" id="dropdownMenu">
@@ -739,7 +773,7 @@ $start_solid = $is_products_page || $is_about_page || $is_contact_page ||
                                     <a href="<?php echo $setup_store_path; ?>" class="dropdown-item setup-store-highlight <?php echo $is_setup_store_page ? 'active' : ''; ?>">
                                         <i class="ri-store-2-line"></i> 
                                         <span>Setup Your Store</span>
-                                        <i class="ri-sparkling-line" style="color: #0F2E15;"></i>
+                                        <i class="ri-sparkling-line"></i>
                                     </a>
                                 <?php endif; ?>
                             <?php endif; ?>
