@@ -10,10 +10,41 @@ if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
 
 $admin_id = $_SESSION['user_id'];
 
+// Ensure expiration columns exist (inline safe migration)
+function ensure_product_expiration_columns($conn) {
+    $columns = [
+        'expiration_duration_seconds' => "INT NULL DEFAULT NULL",
+        'expires_at' => "DATETIME NULL DEFAULT NULL",
+        'is_expired' => "TINYINT(1) NOT NULL DEFAULT 0",
+        'approved_at' => "DATETIME NULL DEFAULT NULL"
+    ];
+    foreach ($columns as $name => $definition) {
+        $check = $conn->query("SHOW COLUMNS FROM products LIKE '{$name}'");
+        if ($check && $check->num_rows === 0) {
+            $conn->query("ALTER TABLE products ADD COLUMN {$name} {$definition}");
+        }
+    }
+}
+ensure_product_expiration_columns($farmcart->conn);
+
+// Mark expired products
+$farmcart->conn->query("UPDATE products SET is_expired = 1, is_listed = 0 WHERE (is_expired IS NULL OR is_expired = 0) AND expires_at IS NOT NULL AND expires_at <= NOW()");
+
 // Handle product approval (for products table)
 if (isset($_GET['approve'])) {
     $id = (int)$_GET['approve'];
-    $stmt = $farmcart->conn->prepare("UPDATE products SET approval_status='approved', is_listed=TRUE, reviewed_by=?, reviewed_at=NOW() WHERE product_id=? AND approval_status='pending'");
+    $stmt = $farmcart->conn->prepare("UPDATE products 
+                                      SET approval_status='approved',
+                                          is_listed=TRUE,
+                                          reviewed_by=?,
+                                          reviewed_at=NOW(),
+                                          approved_at=NOW(),
+                                          expires_at = CASE 
+                                              WHEN expiration_duration_seconds IS NOT NULL THEN DATE_ADD(NOW(), INTERVAL expiration_duration_seconds SECOND)
+                                              ELSE NULL
+                                          END,
+                                          is_expired = 0
+                                      WHERE product_id=? AND approval_status='pending'");
     if ($stmt) {
         $stmt->bind_param("ii", $admin_id, $id);
         $stmt->execute();
@@ -128,6 +159,8 @@ $pending_query = "SELECT
                     p.category_id,
                     p.unit_type,
                     p.base_price,
+                    p.expires_at,
+                    p.expiration_duration_seconds,
                     p.approval_status,
                     p.created_by,
                     p.created_at,
@@ -145,6 +178,7 @@ $pending_query = "SELECT
                  LEFT JOIN users u ON p.created_by = u.user_id
                  LEFT JOIN farmer_profiles fp ON p.created_by = fp.user_id
                  WHERE p.approval_status = 'pending'
+                   AND (p.is_expired IS NULL OR p.is_expired = 0)
                  ORDER BY p.created_at DESC";
 $pending = $farmcart->conn->query($pending_query);
 
@@ -162,6 +196,8 @@ $approved_query = "SELECT
                     p.category_id,
                     p.unit_type,
                     p.base_price,
+                    p.expires_at,
+                    p.expiration_duration_seconds,
                     p.approval_status,
                     p.created_by,
                     p.created_at,
@@ -179,6 +215,7 @@ $approved_query = "SELECT
                  LEFT JOIN users u ON p.created_by = u.user_id
                  LEFT JOIN farmer_profiles fp ON p.created_by = fp.user_id
                  WHERE p.approval_status = 'approved'
+                   AND (p.is_expired IS NULL OR p.is_expired = 0)
                  ORDER BY p.created_at DESC";
 $approved = $farmcart->conn->query($approved_query);
 
@@ -195,6 +232,9 @@ $declined_query = "SELECT
                     p.category_id,
                     p.unit_type,
                     p.base_price,
+                    p.expires_at,
+                    p.expiration_duration_seconds,
+                    p.admin_notes,
                     p.approval_status,
                     p.created_by,
                     p.created_at,
@@ -215,6 +255,7 @@ $declined_query = "SELECT
                  LEFT JOIN farmer_profiles fp ON p.created_by = fp.user_id
                  LEFT JOIN users u2 ON p.reviewed_by = u2.user_id
                  WHERE p.approval_status = 'rejected'
+                   AND (p.is_expired IS NULL OR p.is_expired = 0)
                  ORDER BY p.reviewed_at DESC";
 $declined = $farmcart->conn->query($declined_query);
 
@@ -390,7 +431,7 @@ $tab = isset($_GET['tab']) ? $_GET['tab'] : 'pending';
                                     </div>
                                 </div>
                                 <div class="col-md-2 col-6 mb-3">
-                                    <div class="stats-card bg-danger">
+                                    <div class="stats-card bg-danger" data-tab="declined">
                                         <div class="card-body">
                                             <h4><?= $stats['declined'] ?></h4>
                                             <p>Declined Products</p>
@@ -589,6 +630,10 @@ $tab = isset($_GET['tab']) ? $_GET['tab'] : 'pending';
                             <label class="form-label fw-semibold">Base Price (₱)</label>
                             <div class="form-control bg-light" id="detailPrice"></div>
                         </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Expiry</label>
+                            <div class="form-control bg-light" id="detailExpiry"></div>
+                        </div>
                         <div class="col-12">
                             <label class="form-label fw-semibold">Product Description</label>
                             <div class="form-control bg-light" id="detailDescription" style="min-height: 120px;"></div>
@@ -633,6 +678,11 @@ $tab = isset($_GET['tab']) ? $_GET['tab'] : 'pending';
                     document.getElementById('detailUnit').textContent = data.unit || '—';
                     document.getElementById('detailPrice').textContent = data.price ? `₱${data.price}` : '—';
                     document.getElementById('detailDescription').textContent = data.description || '—';
+                    // If provided, show expiry; otherwise keep previous text
+                    const expiryEl = document.getElementById('detailExpiry');
+                    if (expiryEl) {
+                        expiryEl.textContent = data.expires_at || '—';
+                    }
                 } catch (e) {
                     console.error('Failed to parse product data', e);
                 }

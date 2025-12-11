@@ -12,6 +12,23 @@ $farmer_id = $_SESSION['user_id'];
 $farmer_name = $_SESSION['first_name'] . ' ' . $_SESSION['last_name'];
 $farmer_profile = $farmcart->get_farmer_profile($farmer_id);
 
+// Ensure expiration columns exist (safe inline migration)
+function ensure_product_expiration_columns($conn) {
+    $columns = [
+        'expiration_duration_seconds' => "INT NULL DEFAULT NULL",
+        'expires_at' => "DATETIME NULL DEFAULT NULL",
+        'is_expired' => "TINYINT(1) NOT NULL DEFAULT 0",
+        'approved_at' => "DATETIME NULL DEFAULT NULL"
+    ];
+    foreach ($columns as $name => $definition) {
+        $check = $conn->query("SHOW COLUMNS FROM products LIKE '{$name}'");
+        if ($check && $check->num_rows === 0) {
+            $conn->query("ALTER TABLE products ADD COLUMN {$name} {$definition}");
+        }
+    }
+}
+ensure_product_expiration_columns($farmcart->conn);
+
 // Get product ID from URL
 if (!isset($_GET['id']) || empty($_GET['id'])) {
     $_SESSION['edit_error'] = "Product ID is required.";
@@ -33,6 +50,15 @@ $stmt->execute();
 $product_result = $stmt->get_result();
 $product = $product_result->fetch_assoc();
 $stmt->close();
+
+$existing_duration = isset($product['expiration_duration_seconds']) ? (int)$product['expiration_duration_seconds'] : 0;
+$prefill_months = intdiv($existing_duration, 2592000); // 30 days month
+$remaining = $existing_duration - ($prefill_months * 2592000);
+$prefill_days = intdiv($remaining, 86400);
+$remaining -= ($prefill_days * 86400);
+$prefill_hours = intdiv($remaining, 3600);
+$remaining -= ($prefill_hours * 3600);
+$prefill_seconds = $remaining;
 
 if (!$product) {
     $_SESSION['edit_error'] = "Product not found or you don't have permission to edit it.";
@@ -92,10 +118,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['resubmit_product'])) 
         $description = $farmcart->conn->real_escape_string($_POST['description']);
         $unit_type = $farmcart->conn->real_escape_string($_POST['unit_type']);
         $base_price = floatval($_POST['base_price']);
+        $exp_months = isset($_POST['exp_months']) ? max(0, (int)$_POST['exp_months']) : 0;
+        $exp_days = isset($_POST['exp_days']) ? max(0, (int)$_POST['exp_days']) : 0;
+        $exp_hours = isset($_POST['exp_hours']) ? max(0, (int)$_POST['exp_hours']) : 0;
+        $exp_seconds = isset($_POST['exp_seconds']) ? max(0, (int)$_POST['exp_seconds']) : 0;
+        $expiration_duration_seconds = (($exp_months * 30 + $exp_days) * 24 * 3600) + ($exp_hours * 3600) + $exp_seconds;
 
         // Validate required fields
         if (empty($product_name) || empty($category_id) || empty($unit_type) || $base_price <= 0) {
             $error = "Please fill in all required fields with valid values.";
+        } elseif ($expiration_duration_seconds <= 0) {
+            $error = "Please provide an expiration duration greater than zero.";
         } else {
             // Update product and resubmit for approval (clear admin_notes, set status to pending)
             $update_sql = "UPDATE products SET 
@@ -104,6 +137,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['resubmit_product'])) 
                           category_id = ?, 
                           unit_type = ?, 
                           base_price = ?,
+                          expiration_duration_seconds = ?,
+                          expires_at = NULL,
+                          is_expired = 0,
+                          approved_at = NULL,
                           approval_status = 'pending',
                           admin_notes = NULL,
                           reviewed_by = NULL,
@@ -113,7 +150,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['resubmit_product'])) 
             $update_stmt = $farmcart->conn->prepare($update_sql);
 
             if ($update_stmt) {
-                $update_stmt->bind_param("sisdsii", $product_name, $description, $category_id, $unit_type, $base_price, $product_id, $farmer_id);
+                // Types: s s i s d i i i
+                $update_stmt->bind_param("ssisdiii", $product_name, $description, $category_id, $unit_type, $base_price, $expiration_duration_seconds, $product_id, $farmer_id);
 
                 if ($update_stmt->execute()) {
                     // Handle image upload if new image is provided
@@ -385,6 +423,37 @@ $categories_result = $farmcart->conn->query($categories_sql);
                   </div>
 
                   <div class="col-12">
+                    <label class="form-label fw-semibold required-field">Expiration Duration</label>
+                    <div class="row g-2">
+                      <div class="col-6 col-md-3">
+                        <div class="input-group input-group-sm">
+                          <span class="input-group-text">Months</span>
+                          <input type="number" name="exp_months" min="0" class="form-control" value="<?= $prefill_months ?>" required>
+                        </div>
+                      </div>
+                      <div class="col-6 col-md-3">
+                        <div class="input-group input-group-sm">
+                          <span class="input-group-text">Days</span>
+                          <input type="number" name="exp_days" min="0" class="form-control" value="<?= $prefill_days ?>" required>
+                        </div>
+                      </div>
+                      <div class="col-6 col-md-3">
+                        <div class="input-group input-group-sm">
+                          <span class="input-group-text">Hours</span>
+                          <input type="number" name="exp_hours" min="0" class="form-control" value="<?= $prefill_hours ?>" required>
+                        </div>
+                      </div>
+                      <div class="col-6 col-md-3">
+                        <div class="input-group input-group-sm">
+                          <span class="input-group-text">Seconds</span>
+                          <input type="number" name="exp_seconds" min="0" class="form-control" value="<?= $prefill_seconds ?>" required>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="form-text">Product will expire after admin approval using this duration (months counted as 30 days).</div>
+                  </div>
+
+                  <div class="col-12">
                     <label class="form-label fw-semibold required-field">Product Description</label>
                     <textarea name="description" class="form-control" rows="5" 
                               placeholder="Describe your product in detail (quality, farming methods, storage instructions, etc.)..." 
@@ -433,6 +502,7 @@ $categories_result = $farmcart->conn->query($categories_sql);
                     <li>Unit Type</li>
                     <li>Base Price</li>
                     <li>Description</li>
+                    <li>Expiration Duration</li>
                   </ul>
                 </div>
               </div>
