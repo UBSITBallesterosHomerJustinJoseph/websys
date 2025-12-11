@@ -1,0 +1,73 @@
+.contact-section {
+  background: var(--light-bg);
+}
+
+.contact-badge {
+  display: inline-block;
+  background: var(--accent-gold);
+  color: var(--dark-green);
+  padding: 6px 16px;
+  border-radius: 50px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 1rem;
+}
+
+.contact-title {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--dark-green);
+  margin-bottom: 1rem;
+}
+
+.contact-title .text-accent {
+  color: var(--accent-gold);
+}
+
+.contact-subtitle {
+  font-size: 1.1rem;
+  color: var(--text-light);
+  max-width: 600px;
+  margin: 0 auto 2rem;
+}
+
+.contact-card,
+.contact-info-card {
+  border-radius: 20px;
+  background: var(--white);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.contact-card:hover,
+.contact-info-card:hover {
+  transform: translateY(-5px);
+  box-shadow: var(--shadow-lg);
+}
+
+.form-control {
+  border: 2px solid var(--border-light);
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  transition: all 0.3s ease;
+}
+
+.form-control:focus {
+  border-color: var(--primary-green);
+  box-shadow: 0 0 0 0.25rem rgba(78, 101, 61, 0.15);
+}
+
+.btn-success {
+  background: var(--gradient-primary);
+  border: none;
+  border-radius: 50px;
+  font-weight: 600;
+  padding: 0.85rem 2rem;
+  transition: all 0.3s ease;
+}
+
+.btn-success:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(78, 101, 61, 0.3);
+}

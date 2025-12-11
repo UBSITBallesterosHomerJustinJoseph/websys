@@ -1,0 +1,108 @@
+/* Assets/css/variables.css */
+:root {
+    /* Primary Colors */
+    --farmcart-green: #4E653D;
+    --farmcart-green-light: #6B8E4E;
+    --farmcart-green-dark: #3A4D2E;
+    --farmcart-green-bright: #7BA05B;
+
+    /* Neutral Colors */
+    --farmcart-beige: #F5F5DC;
+    --farmcart-cream: #FFFDD0;
+    --farmcart-white: #FFFFFF;
+    --farmcart-light-gray: #F8F9FA;
+    --farmcart-gray: #6C757D;
+    --farmcart-dark: #343A40;
+
+    /* Accent Colors */
+    --farmcart-brown: #8B7355;
+    --farmcart-tan: #D2B48C;
+    --farmcart-gold: #FFD700;
+    --farmcart-orange: #FFA500;
+
+    /* Semantic Colors */
+    --success: #28A745;
+    --warning: #FFC107;
+    --danger: #DC3545;
+    --info: #17A2B8;
+
+    /* Typography */
+    --font-primary: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    --font-heading: 'Georgia', 'Times New Roman', serif;
+
+    /* Spacing */
+    --spacing-xs: 0.25rem;
+    --spacing-sm: 0.5rem;
+    --spacing-md: 1rem;
+    --spacing-lg: 1.5rem;
+    --spacing-xl: 2rem;
+    --spacing-xxl: 3rem;
+
+    /* Border Radius */
+    --border-radius-sm: 0.25rem;
+    --border-radius-md: 0.5rem;
+    --border-radius-lg: 0.75rem;
+    --border-radius-xl: 1rem;
+    --border-radius-pill: 50rem;
+
+    /* Shadows */
+    --shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    --shadow-md: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    --shadow-lg: 0 1rem 3rem rgba(0, 0, 0, 0.175);
+    --shadow-green: 0 0.5rem 1rem rgba(78, 101, 61, 0.3);
+}
+
+/* Utility Classes */
+.text-farmcart { color: var(--farmcart-green) !important; }
+.bg-farmcart { background-color: var(--farmcart-green) !important; }
+.border-farmcart { border-color: var(--farmcart-green) !important; }
+
+.text-farmcart-light { color: var(--farmcart-green-light) !important; }
+.bg-farmcart-light { background-color: var(--farmcart-green-light) !important; }
+
+.text-farmcart-dark { color: var(--farmcart-green-dark) !important; }
+.bg-farmcart-dark { background-color: var(--farmcart-green-dark) !important; }
+
+/* Button Styles */
+.btn-farmcart {
+    background-color: var(--farmcart-green);
+    border-color: var(--farmcart-green);
+    color: white;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.btn-farmcart:hover {
+    background-color: var(--farmcart-green-dark);
+    border-color: var(--farmcart-green-dark);
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-green);
+}
+
+.btn-outline-farmcart {
+    background-color: transparent;
+    border-color: var(--farmcart-green);
+    color: var(--farmcart-green);
+    font-weight: 600;
+}
+
+.btn-outline-farmcart:hover {
+    background-color: var(--farmcart-green);
+    border-color: var(--farmcart-green);
+    color: white;
+    transform: translateY(-2px);
+}
+
+/* Card Styles */
+.card-farmcart {
+    border: 1px solid rgba(78, 101, 61, 0.125);
+    border-radius: var(--border-radius-lg);
+    transition: all 0.3s ease;
+}
+
+.card-farmcart:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--shadow-md);
+    border-color: var(--farmcart-green-light);
+}

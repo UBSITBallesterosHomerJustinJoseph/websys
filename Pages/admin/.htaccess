@@ -1,0 +1,38 @@
+# Enable rewrite engine
+RewriteEngine On
+
+# Protect sensitive files
+<FilesMatch "\.(inc|sql|log|ini)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# Allow access to specific PHP files
+<FilesMatch "^(index|orders|reports|settings|view_order)\.php$">
+    Order Allow,Deny
+    Allow from all
+</FilesMatch>
+
+# Deny access to config files
+<FilesMatch "^\.ht">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# Deny access to partials directory
+RewriteRule ^partials/ - [F,L]
+
+# Cache static files
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/css "access plus 1 month"
+    ExpiresByType application/javascript "access plus 1 month"
+    ExpiresByType image/jpeg "access plus 1 year"
+    ExpiresByType image/png "access plus 1 year"
+    ExpiresByType image/gif "access plus 1 year"
+</IfModule>
+
+# Compress files
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript application/javascript
+</IfModule>
