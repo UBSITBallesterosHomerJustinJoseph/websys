@@ -27,6 +27,7 @@ if ($is_in_header) {
     $profile_path = '../Pages/customer/profile.php';
     $edit_profile_path = '../Pages/customer/edit-profile.php';
     $orders_path = '../Pages/customer/orders.php';
+    $checkorders_path = '../Pages/customer/checkorders.php';
     $wishlist_path = '../Pages/customer/wishlist.php';
     $setup_store_path = '../Pages/customer/setUpStore.php';
 } elseif ($is_in_pages_customer) {
@@ -42,6 +43,7 @@ if ($is_in_header) {
     $profile_path = 'profile.php';
     $edit_profile_path = 'edit-profile.php';
     $orders_path = 'orders.php';
+    $checkorders_path = 'checkorders.php';
     $wishlist_path = 'wishlist.php';
     $setup_store_path = 'setUpStore.php';
 } elseif ($is_in_pages_farmer) {
@@ -57,6 +59,7 @@ if ($is_in_header) {
     $profile_path = '../customer/profile.php';
     $edit_profile_path = '../customer/edit-profile.php';
     $orders_path = '../customer/orders.php';
+    $checkorders_path = '../customer/checkorders.php';
     $wishlist_path = '../customer/wishlist.php';
     $setup_store_path = '../customer/setUpStore.php';
 } elseif ($is_in_pages_admin) {
@@ -72,6 +75,7 @@ if ($is_in_header) {
     $profile_path = '../customer/profile.php';
     $edit_profile_path = '../customer/edit-profile.php';
     $orders_path = '../customer/orders.php';
+    $checkorders_path = '../customer/checkorders.php';
     $wishlist_path = '../customer/wishlist.php';
     $setup_store_path = '../customer/setUpStore.php';
 } else {
@@ -87,6 +91,7 @@ if ($is_in_header) {
     $profile_path = 'Pages/customer/profile.php';
     $edit_profile_path = 'Pages/customer/edit-profile.php';
     $orders_path = 'Pages/customer/orders.php';
+    $checkorders_path = 'Pages/customer/checkorders.php';
     $wishlist_path = 'Pages/customer/wishlist.php';
     $setup_store_path = 'Pages/customer/setUpStore.php';
 }
@@ -164,6 +169,12 @@ if ($is_logged_in) {
                         <i class="fas fa-phone-alt"></i> Contact
                     </a>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link <?php echo ($current_page == 'cart.php') ? 'active' : ''; ?>" href="<?php echo str_replace('products.php', 'cart.php', $products_path); ?>">
+                        <i class="fas fa-shopping-cart"></i> Cart
+                    </a>
+                </li> 
+
             </ul>
 
             <!-- Search Form -->
@@ -248,7 +259,7 @@ if ($is_logged_in) {
                                 <li><a class="dropdown-item" href="<?php echo $profile_path; ?>"><i class="fas fa-user-circle me-2"></i>Profile</a></li>
                                 <li><a class="dropdown-item" href="<?php echo $edit_profile_path; ?>"><i class="fas fa-edit me-2"></i>Edit Profile</a></li>
                                 <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="<?php echo $orders_path; ?>"><i class="fas fa-shopping-cart me-2"></i>Orders</a></li>
+                                <li><a class="dropdown-item" href="<?php echo $checkorders_path; ?>"><i class="fas fa-box me-2"></i>My Orders</a></li>
                                 <li><a class="dropdown-item" href="<?php echo $wishlist_path; ?>"><i class="fas fa-heart me-2"></i>Wishlist</a></li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="<?php echo $admin_dashboard_path; ?>"><i class="fas fa-cog me-2"></i>Admin Dashboard</a></li>
@@ -259,7 +270,7 @@ if ($is_logged_in) {
                                 <li><a class="dropdown-item" href="<?php echo $profile_path; ?>"><i class="fas fa-user-circle me-2"></i>Profile</a></li>
                                 <li><a class="dropdown-item" href="<?php echo $edit_profile_path; ?>"><i class="fas fa-edit me-2"></i>Edit Profile</a></li>
                                 <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="<?php echo $orders_path; ?>"><i class="fas fa-shopping-cart me-2"></i>Orders</a></li>
+                                <li><a class="dropdown-item" href="<?php echo $checkorders_path; ?>"><i class="fas fa-box me-2"></i>My Orders</a></li>
                                 <li><a class="dropdown-item" href="<?php echo $wishlist_path; ?>"><i class="fas fa-heart me-2"></i>Wishlist</a></li>
                                 <li><hr class="dropdown-divider"></li>
 

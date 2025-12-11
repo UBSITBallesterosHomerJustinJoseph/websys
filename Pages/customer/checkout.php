@@ -3,6 +3,14 @@ session_start();
 include '../../db_connect.php';
 
 $userId = $_SESSION['user_id'] ?? null;
+
+// Require login for checkout
+if (!$userId) {
+    $_SESSION['redirect_after_login'] = 'checkout.php';
+    header('Location: ../index.php');
+    exit;
+}
+
 $items = [];
 $subtotal = 0;
 $customer = null;
@@ -10,7 +18,7 @@ $customer = null;
 // --- Fetch Cart Items ---
 if ($userId) {
     $stmt = $farmcart->conn->prepare("
-        SELECT p.product_name, c.quantity, p.base_price 
+        SELECT c.cart_id, c.product_id, p.product_name, c.quantity, p.base_price, p.unit_type
         FROM carts c
         JOIN products p ON c.product_id = p.product_id
         WHERE c.user_id = ?
@@ -22,6 +30,7 @@ if ($userId) {
         $items[] = $row;
         $subtotal += $row['base_price'] * $row['quantity'];
     }
+    $stmt->close();
 
     // --- Fetch Customer Info ---
     $stmtUser = $farmcart->conn->prepare("
@@ -31,11 +40,36 @@ if ($userId) {
     $stmtUser->bind_param("i", $userId);
     $stmtUser->execute();
     $customer = $stmtUser->get_result()->fetch_assoc();
+    $stmtUser->close();
 } else {
-    $items = $_SESSION['guest_cart'] ?? [];
-    foreach ($items as $item) {
-        $subtotal += $item['base_price'] * $item['quantity'];
+    // Guest cart
+    $guestCart = $_SESSION['guest_cart'] ?? [];
+    foreach ($guestCart as $productId => $cartItem) {
+        if (isset($cartItem['product_id'])) {
+            $sql = "SELECT product_id, product_name, base_price, unit_type 
+                    FROM products 
+                    WHERE product_id = ? AND approval_status = 'approved' AND is_listed = TRUE";
+            $stmt = $farmcart->conn->prepare($sql);
+            if ($stmt) {
+                $stmt->bind_param("i", $productId);
+                $stmt->execute();
+                $result = $stmt->get_result();
+                if ($product = $result->fetch_assoc()) {
+                    $product['quantity'] = $cartItem['quantity'];
+                    $product['cart_id'] = 'guest_' . $productId;
+                    $items[] = $product;
+                    $subtotal += $product['base_price'] * $cartItem['quantity'];
+                }
+                $stmt->close();
+            }
+        }
     }
+}
+
+// Redirect if cart is empty
+if (empty($items)) {
+    header('Location: cart.php');
+    exit;
 }
 
 $total = $subtotal; // pickup only, no shipping fee
@@ -55,7 +89,20 @@ $total = $subtotal; // pickup only, no shipping fee
   <?php require_once '../../Includes/navbar.php'; ?>
 
   <div class="checkout-container">
-    <h1 class="checkout-title">🧾 Checkout (Pickup)</h1>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h1 class="checkout-title mb-0">🧾 Checkout (Pickup)</h1>
+      <a href="cart.php" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left me-2"></i>Back to Cart
+      </a>
+    </div>
+    
+    <?php if (isset($_SESSION['checkout_error'])): ?>
+      <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <?= htmlspecialchars($_SESSION['checkout_error']); ?>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+      <?php unset($_SESSION['checkout_error']); ?>
+    <?php endif; ?>
 
     <div class="row">
       <!-- Left Column -->
@@ -109,15 +156,24 @@ $total = $subtotal; // pickup only, no shipping fee
           <!-- Payment -->
           <div class="checkout-card">
             <h3><i class="fas fa-credit-card"></i> Payment Method</h3>
-            <p class="form-instructions">Choose how you’ll pay at pickup.</p>
+            <p class="form-instructions">Choose how you'll pay at pickup.</p>
             <div class="mb-3">
               <select class="form-select" name="payment_method" required>
                 <option value="cod">Cash on Pickup</option>
-                <option value="card">Credit/Debit Card</option>
                 <option value="gcash">GCash</option>
+                <option value="paymaya">PayMaya</option>
+                <option value="bank_transfer">Bank Transfer</option>
               </select>
             </div>
           </div>
+          
+          <!-- Hidden fields for cart items -->
+          <?php foreach ($items as $index => $item): ?>
+            <input type="hidden" name="items[<?= $index; ?>][product_id]" value="<?= htmlspecialchars($item['product_id']); ?>">
+            <input type="hidden" name="items[<?= $index; ?>][quantity]" value="<?= htmlspecialchars($item['quantity']); ?>">
+            <input type="hidden" name="items[<?= $index; ?>][price]" value="<?= htmlspecialchars($item['base_price']); ?>">
+          <?php endforeach; ?>
+          <input type="hidden" name="total_amount" value="<?= $total; ?>">
 
           <!-- Final Reminder -->
           <p class="form-instructions">✅ Review your details carefully before confirming your pickup order.</p>

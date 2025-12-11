@@ -57,7 +57,7 @@ body {
 
 .cart-item-info {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 15px;
   flex-grow: 1;
 }
@@ -66,36 +66,64 @@ body {
   height: 80px;
   object-fit: cover;
   border-radius: 8px;
+  flex-shrink: 0;
 }
 .cart-item-name {
   font-weight: 600;
   color: var(--dark-green);
-  font-size: 1.2rem;
+  font-size: 1.1rem;
+  margin-bottom: 4px;
+  display: block;
+}
+.cart-item-unit {
+  color: var(--text-light);
+  font-size: 0.875rem;
+  display: block;
+  margin-bottom: 8px;
 }
 .cart-item-qty {
-  color: var(--text-light);
+  color: var(--text-dark);
   font-size: 1rem;
+  font-weight: 600;
+  min-width: 30px;
+  text-align: center;
 }
 .cart-item-price {
   font-weight: 700;
   color: var(--accent-gold);
   font-size: 1.1rem;
-  min-width: 100px;
+  min-width: 120px;
   text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
 }
 
 .cart-footer {
   margin-top: 30px;
+  padding-top: 30px;
+  border-top: 2px solid var(--border-light);
   display: flex;
   justify-content: space-between;
   flex-wrap: wrap;
+  gap: 20px;
+  align-items: center;
+}
+.cart-total {
+  display: flex;
   gap: 15px;
   align-items: center;
 }
-.cart-total span {
+.cart-total span:first-child {
+  font-weight: 600;
+  font-size: 1.2rem;
+  color: var(--text-dark);
+}
+.cart-total span:last-child {
   font-weight: 700;
-  font-size: 1.3rem;
-  color: var(--dark-green);
+  font-size: 1.5rem;
+  color: var(--primary-green);
 }
 
 .btn-checkout {
@@ -148,24 +176,43 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
-@media (max-width: 600px) {
+@media (max-width: 768px) {
   .cart-container {
     padding: 20px;
+    margin: 20px auto;
+  }
+  .cart-title {
+    font-size: 2rem;
   }
   .cart-item {
     flex-direction: column;
     align-items: flex-start;
+    gap: 15px;
+  }
+  .cart-item-info {
+    width: 100%;
   }
   .cart-item-price {
     text-align: left;
+    align-items: flex-start;
+    width: 100%;
     margin-top: 10px;
   }
   .cart-footer {
     flex-direction: column;
     align-items: stretch;
   }
+  .cart-total {
+    justify-content: space-between;
+    width: 100%;
+  }
+  .cart-actions {
+    width: 100%;
+    flex-direction: column;
+  }
   .btn-checkout, .btn-back {
     width: 100%;
     text-align: center;
+    justify-content: center;
   }
 }

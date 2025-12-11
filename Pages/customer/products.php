@@ -283,7 +283,7 @@ if ($products_result) {
                                                 <i class="fas fa-eye me-1"></i>View Image
                                             </button>
                                         <?php endif; ?>
-                                        <button class="btn btn-sm btn-success" onclick="addToCart(<?= $product['product_id'] ?>)">
+                                        <button class="btn btn-sm btn-success" onclick="addToCart(<?= $product['product_id'] ?>, event)">
                                             <i class="fas fa-cart-plus me-1"></i>Add to Cart
                                         </button>
                                     </div>
@@ -400,10 +400,79 @@ if ($products_result) {
         }
 
         // Add to Cart Function
-        function addToCart(productId) {
-            // Here you would typically send an AJAX request to add to cart
-            alert('Product added to cart! (Functionality to be implemented)');
-            console.log('Added product ' + productId + ' to cart');
+        function addToCart(productId, evt) {
+            // Get the button that was clicked
+            const btn = evt ? evt.target.closest('button') : (window.event ? window.event.target.closest('button') : null);
+            if (!btn) {
+                // Fallback: find button by product ID
+                const buttons = document.querySelectorAll(`button[onclick*="addToCart(${productId}"]`);
+                if (buttons.length > 0) {
+                    btn = buttons[buttons.length - 1];
+                } else {
+                    console.error('Could not find button');
+                    return;
+                }
+            }
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Adding...';
+            
+            // Send AJAX request
+            const formData = new FormData();
+            formData.append('product_id', productId);
+            formData.append('quantity', 1);
+            
+            fetch('add_to_cart.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Show success message
+                    btn.innerHTML = '<i class="fas fa-check me-1"></i>Added!';
+                    btn.classList.remove('btn-success');
+                    btn.classList.add('btn-outline-success');
+                    
+                    // Show toast notification
+                    showToast(data.message, 'success');
+                    
+                    // Reset button after 2 seconds
+                    setTimeout(() => {
+                        btn.innerHTML = originalText;
+                        btn.classList.remove('btn-outline-success');
+                        btn.classList.add('btn-success');
+                        btn.disabled = false;
+                    }, 2000);
+                } else {
+                    alert(data.message || 'Failed to add product to cart.');
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred. Please try again.');
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            });
+        }
+        
+        // Toast notification function
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            toast.className = `alert alert-${type === 'success' ? 'success' : 'danger'} alert-dismissible fade show position-fixed`;
+            toast.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+            toast.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.body.appendChild(toast);
+            
+            // Auto remove after 3 seconds
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
         }
 
         // Product Details Modal
