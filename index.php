@@ -52,426 +52,313 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_store'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FarmCart - Fresh Farm Products</title>
-    <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <title>Farm Fresh Market - Premium Local Produce, Livestock & Seasonal Harvests</title>
+    <meta name="description" content="Discover premium quality produce, livestock, and seasonal harvests from local farms. Fresh fish, fruits, vegetables, grass-fed beef, free-range chicken, and more delivered from farm to your table.">
+    <meta name="keywords" content="farm fresh, local produce, organic vegetables, grass-fed beef, free-range chicken, seasonal harvest, fresh fish, farm market">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <!-- Navbar CSS -->
-    <link rel="stylesheet" href="Assets/css/navbar.css">
-    <link rel="stylesheet" href="Assets/css/customer.css">
+    
+    <!-- Remix Icon -->
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+    
+    <!-- External CSS -->
+    <link rel="stylesheet" href="Assets/css/style-index.css">
 </head>
 <body>
-    <!-- Include Navbar -->
+    <!-- Navigation -->
     <?php include 'Includes/navbar.php'; ?>
 
-    <!-- Store Creation Modal (only show if user is logged in as customer) -->
-    <?php if (isset($_SESSION['user_id']) && $user_role === 'customer' && $can_create_store): ?>
-    <div class="modal fade" id="storeModal" tabindex="-1" aria-labelledby="storeModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="storeModalLabel">Setup Your Farm Store</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <?php if (isset($error)): ?>
-                        <div class="alert alert-danger"><?php echo htmlspecialchars($error); ?></div>
-                    <?php endif; ?>
-
-                    <form method="post" id="storeForm">
-                        <!-- Farm Name -->
-                        <div class="mb-3">
-                            <label for="store_name" class="form-label">Farm Name *</label>
-                            <input type="text" class="form-control" id="store_name" name="store_name" required>
-                        </div>
-
-                        <!-- Farm Location -->
-                        <div class="mb-3">
-                            <label for="store_address" class="form-label">Farm Location *</label>
-                            <textarea class="form-control" id="store_address" name="store_address" rows="2" required></textarea>
-                        </div>
-
-                        <!-- Farm Size -->
-                        <div class="mb-3">
-                            <label for="farm_size" class="form-label">Farm Size (hectares)</label>
-                            <input type="number" class="form-control" id="farm_size" name="farm_size" min="0">
-                        </div>
-
-                        <!-- Farming Method -->
-                        <div class="mb-3">
-                            <label for="farming_method" class="form-label">Farming Method</label>
-                            <select class="form-control" id="farming_method" name="farming_method">
-                                <option value="Organic">Organic</option>
-                                <option value="Conventional">Conventional</option>
-                                <option value="Hydroponic">Hydroponic</option>
-                                <option value="Other">Other</option>
-                            </select>
-                        </div>
-
-                        <!-- Years of Experience -->
-                        <div class="mb-3">
-                            <label for="years_experience" class="form-label">Years of Experience</label>
-                            <input type="number" class="form-control" id="years_experience" name="years_experience" min="0">
-                        </div>
-
-                        <!-- Certification Details -->
-                        <div class="mb-3">
-                            <label for="certification_details" class="form-label">Certification Details</label>
-                            <textarea class="form-control" id="certification_details" name="certification_details" rows="2"></textarea>
-                        </div>
-
-                        <!-- Farmer Bio -->
-                        <div class="mb-3">
-                            <label for="bio" class="form-label">Farmer Bio</label>
-                            <textarea class="form-control" id="bio" name="bio" rows="3"></textarea>
-                        </div>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <button type="submit" form="storeForm" name="create_store" class="btn btn-primary">Create Store</button>
-                </div>
+    <!-- Hero Section -->
+    <section id="home" class="hero">
+        <div class="hero-content">
+            <h2>Fresh from Farm<span class="highlight">to Your Table</span></h2>
+            <p>Discover premium quality produce, livestock, and seasonal harvests from local farms</p>
+            <div class="hero-buttons">
+                <?php if (isset($_SESSION['user_id'])): ?>
+                    <a href="Pages/customer/products.php" class="btn btn-primary">Shop Now</a>
+                <?php else: ?>
+                    <a href="Register/index.php" class="btn btn-primary">Shop Now</a>
+                <?php endif; ?>
+                <button class="btn btn-secondary" onclick="document.getElementById('featured').scrollIntoView({behavior: 'smooth'})">Learn More</button>
             </div>
-        </div>
-    </div>
-    <?php endif; ?>
-
-    <!-- Enhanced Hero Section -->
-    <section class="hero-section">
-        <div class="hero-background">
-            <div class="hero-pattern"></div>
-        </div>
-        <div class="container">
-            <div class="hero-content">
-                <div class="hero-badge">Fresh From Farm</div>
-                <h1 class="hero-title">Fresh Vegetables & Livestock</h1>
-                <p class="hero-subtitle">Direct from local farms to your doorstep. Fresh, organic, and humanely raised with care.</p>
-                <div class="hero-actions">
-                    <button class="btn btn-primary hero-btn" onclick="scrollToCategories()">
-                        <i class="fas fa-shopping-basket me-2"></i>
-                        Shop Now
-                    </button>
-
-                    <!-- Dynamic Button based on login status -->
-                    <?php if (!isset($_SESSION['user_id'])): ?>
-                        <!-- Show login/signup buttons for guests -->
-                        <a href="Register/login.php" class="btn btn-success hero-btn">
-                            <i class="fas fa-sign-in-alt me-2"></i>
-                            Login to Shop
-                        </a>
-                        <a href="Register/index.php" class="btn btn-outline-light hero-btn">
-                            <i class="fas fa-user-plus me-2"></i>
-                            Sign Up
-                        </a>
-                    <?php elseif ($user_role === 'customer'): ?>
-                        <!-- Show store setup for logged-in customers -->
-                        <button class="btn btn-success hero-btn" data-bs-toggle="modal" data-bs-target="#storeModal">
-                            <i class="fas fa-store me-2"></i>
-                            Set Up Your Store
-                        </button>
-                    <?php endif; ?>
-                </div>
-                <div class="hero-stats">
-                    <div class="stat-item">
-                        <div class="stat-number">500+</div>
-                        <div class="stat-label">Happy Customers</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-number">50+</div>
-                        <div class="stat-label">Local Farms</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-number">24/7</div>
-                        <div class="stat-label">Fresh Delivery</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="hero-scroll-indicator">
-            <i class="fas fa-chevron-down"></i>
         </div>
     </section>
 
-    <!-- Enhanced Categories Section -->
-    <section class="categories-section" id="categories">
+    <!-- Featured Section -->
+    <section id="featured" class="featured-section">
         <div class="container">
-            <div class="section-header text-center">
-                <h2 class="section-title">Our Farm Categories</h2>
-                <p class="section-subtitle">Discover fresh produce from our trusted local farmers</p>
+            <div class="section-header">
+                <h2>Featured This Week</h2>
+                <p>Discover our handpicked selections and weekly specials</p>
+            </div>
+
+            <div class="carousel">
+                <div class="carousel-inner">
+                    <div class="carousel-slide">
+                        <div class="slide-content">
+                            <h3>Farm Fresh Organic Produce</h3>
+                            <p>Hand-picked daily from our certified organic farms. Experience the difference of truly fresh vegetables and fruits.</p>
+                            <a href="Pages/customer/products.php" class="btn btn-primary" style="width: fit-content;">Shop Produce</a>
+                        </div>
+                        <div class="slide-image">
+                            <img src="https://readdy.ai/api/search-image?query=Beautiful%20organic%20farm%20produce%20display%20with%20colorful%20vegetables%20and%20fruits%20arranged%20artistically%2C%20professional%20food%20photography%2C%20vibrant%20natural%20colors%2C%20clean%20white%20background%2C%20premium%20quality%20presentation&width=800&height=450&seq=carousel001&orientation=landscape" alt="Organic Produce">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="carousel-controls">
+                    <div class="carousel-dot active"></div>
+                    <div class="carousel-dot"></div>
+                    <div class="carousel-dot"></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Categories Section -->
+    <section id="categories" class="categories-section">
+        <div class="container">
+            <div class="section-header">
+                <h2>Our Categories</h2>
+                <p>Explore our wide range of fresh, locally-sourced products carefully selected for quality and taste</p>
             </div>
 
             <div class="categories-grid">
-                <div class="category-card" onclick="showCategory('vegetables')">
-                    <div class="category-icon-wrapper">
-                        <span class="category-icon">🥦</span>
+                <?php if (!empty($categories)): ?>
+                    <?php foreach (array_slice($categories, 0, 4) as $category): ?>
+                    <div class="category-card" onclick="window.location='Pages/customer/products.php?category=<?php echo urlencode($category['category_id']); ?>'">
+                        <img src="<?php echo htmlspecialchars($category['image_url'] ?? 'https://readdy.ai/api/search-image?query=Fresh%20produce%20category&width=400&height=300'); ?>" alt="<?php echo htmlspecialchars($category['category_name']); ?>" class="category-image">
+                        <div class="category-content">
+                            <h3><?php echo htmlspecialchars($category['category_name']); ?></h3>
+                            <p><?php echo htmlspecialchars($category['description'] ?? 'Fresh from local farms'); ?></p>
+                        </div>
                     </div>
-                    <h3 class="category-title">Fresh Vegetables</h3>
-                    <p class="category-description">Seasonal organic vegetables from local farms</p>
-                    <div class="category-badge">Popular</div>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <div style="grid-column: 1/-1; text-align: center; padding: 2rem;">
+                        <p>Categories coming soon!</p>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </section>
+
+    <!-- New Products Section -->
+    <section id="products" class="products-section" style="background-color: rgba(255,255,255,0.5);">
+        <div class="container">
+            <div class="section-header">
+                <h2>New Products</h2>
+                <p>Check out our latest arrivals and seasonal specialties</p>
+            </div>
+
+            <div class="products-grid">
+                <div class="product-card">
+                    <img src="https://readdy.ai/api/search-image?query=Premium%20organic%20heirloom%20tomatoes%20in%20various%20colors%20red%2C%20yellow%2C%20purple%20arranged%20in%20wooden%20basket%2C%20natural%20lighting%2C%20clean%20white%20background%2C%20professional%20food%20photography%20style&width=400&height=350&seq=tomatoes001&orientation=landscape" alt="Heirloom Tomatoes" class="product-image">
+                    <div class="product-content">
+                        <h3>Heirloom Tomatoes</h3>
+                        <p>Colorful, flavorful varieties from heritage seeds</p>
+                        <div class="product-price">$6.99/lb</div>
+                        <button class="btn-add-to-cart" onclick="<?php echo isset($_SESSION['user_id']) ? "alert('Added to cart')" : "window.location='Register/login.php'"; ?>">Add to Cart</button>
+                    </div>
                 </div>
 
-                <div class="category-card" onclick="showCategory('fruits')">
-                    <div class="category-icon-wrapper">
-                        <span class="category-icon">🍎</span>
+                <div class="product-card">
+                    <img src="https://readdy.ai/api/search-image?query=Fresh%20wild%20caught%20salmon%20fillets%20on%20ice%20display%2C%20professional%20seafood%20market%20presentation%2C%20clean%20white%20background%2C%20natural%20lighting%2C%20premium%20fish%20quality&width=400&height=350&seq=salmon001&orientation=landscape" alt="Wild Salmon" class="product-image">
+                    <div class="product-content">
+                        <h3>Wild Salmon</h3>
+                        <p>Fresh wild-caught Pacific salmon</p>
+                        <div class="product-price">$24.99/lb</div>
+                        <button class="btn-add-to-cart" onclick="<?php echo isset($_SESSION['user_id']) ? "alert('Added to cart')" : "window.location='Register/login.php'"; ?>">Add to Cart</button>
                     </div>
-                    <h3 class="category-title">Fresh Fruits</h3>
-                    <p class="category-description">Sweet and juicy seasonal fruits</p>
                 </div>
 
-                <div class="category-card" onclick="showCategory('eggs')">
-                    <div class="category-icon-wrapper">
-                        <span class="category-icon">🥚</span>
+                <div class="product-card">
+                    <img src="https://readdy.ai/api/search-image?query=Artisanal%20goat%20cheese%20wheels%20and%20wedges%20arranged%20on%20wooden%20board%2C%20professional%20dairy%20photography%2C%20clean%20white%20background%2C%20natural%20lighting%2C%20premium%20cheese%20presentation&width=400&height=350&seq=cheese001&orientation=landscape" alt="Artisan Cheese" class="product-image">
+                    <div class="product-content">
+                        <h3>Artisan Goat Cheese</h3>
+                        <p>Locally crafted from our farm-fresh goat milk</p>
+                        <div class="product-price">$12.99</div>
+                        <button class="btn-add-to-cart" onclick="<?php echo isset($_SESSION['user_id']) ? "alert('Added to cart')" : "window.location='Register/login.php'"; ?>">Add to Cart</button>
                     </div>
-                    <h3 class="category-title">Farm Eggs</h3>
-                    <p class="category-description">Free-range and organic eggs</p>
-                </div>
-
-                <div class="category-card" onclick="showCategory('artisan')">
-                    <div class="category-icon-wrapper">
-                        <span class="category-icon">🧀</span>
-                    </div>
-                    <h3 class="category-title">Artisan Products</h3>
-                    <p class="category-description">Local handmade dairy and more</p>
-                </div>
-
-                <div class="category-card" onclick="showCategory('livestock')">
-                    <div class="category-icon-wrapper">
-                        <span class="category-icon">🐄</span>
-                    </div>
-                    <h3 class="category-title">Livestock</h3>
-                    <p class="category-description">Humanely raised meat products</p>
-                    <div class="category-badge">Best Seller</div>
-                </div>
-
-                <div class="category-card" onclick="showCategory('honey')">
-                    <div class="category-icon-wrapper">
-                        <span class="category-icon">🍯</span>
-                    </div>
-                    <h3 class="category-title">Pure Honey</h3>
-                    <p class="category-description">100% natural raw honey</p>
-                </div>
-
-                <div class="category-card" onclick="showCategory('fish')">
-                    <div class="category-icon-wrapper">
-                        <span class="category-icon">🎣</span>
-                    </div>
-                    <h3 class="category-title">Fresh Fish</h3>
-                    <p class="category-description">Local catch delivered fresh</p>
-                    <div class="category-badge">New</div>
-                </div>
-
-                <div class="category-card view-all-card" onclick="showAllCategories()">
-                    <div class="category-icon-wrapper">
-                        <span class="category-icon">📦</span>
-                    </div>
-                    <h3 class="category-title">View All</h3>
-                    <p class="category-description">Explore all categories</p>
                 </div>
             </div>
         </div>
     </section>
 
     <!-- Premium Livestock Section -->
-    <section class="premium-section">
+    <section id="livestock" class="livestock-section">
         <div class="container">
-            <div class="section-header text-center">
-                <h2 class="section-title">Premium Livestock</h2>
-                <p class="section-subtitle">Humanely raised with care on local family farms</p>
+            <div class="section-header">
+                <h2>Premium Livestock</h2>
+                <p>Ethically raised, grass-fed, and hormone-free meat from our trusted local farms</p>
             </div>
 
-            <div class="products-grid">
-                <?php
-                // Sample products data
-                $products = [
-                    [
-                        'icon' => '🐖',
-                        'title' => 'Pasture-Raised Pork',
-                        'description' => 'Humanely raised pork with no antibiotics or hormones. Available as cuts or whole/half animals.',
-                        'price' => '200',
-                        'badge' => 'Most Popular',
-                        'tags' => ['Local Farm', 'Free Range']
-                    ],
-                    [
-                        'icon' => '🐐',
-                        'title' => 'Fresh Goat Meat',
-                        'description' => 'Tender goat meat raised on natural diet, perfect for traditional dishes.',
-                        'price' => '350',
-                        'badge' => '',
-                        'tags' => ['Local Farm', 'Natural Diet']
-                    ],
-                    [
-                        'icon' => '🐔',
-                        'title' => 'Free-Range Chicken',
-                        'description' => 'Pasture-raised chickens with access to outdoors and natural diet.',
-                        'price' => '250',
-                        'badge' => 'Free Range',
-                        'tags' => ['No Antibiotics', 'Free Range']
-                    ],
-                    [
-                        'icon' => '🐄',
-                        'title' => 'Grass-Fed Beef',
-                        'description' => 'Grass-fed beef raised on local family farms, fed on open pasture.',
-                        'price' => '450',
-                        'badge' => '',
-                        'tags' => ['Grass Fed', 'Local Farm']
-                    ]
-                ];
-
-                foreach ($products as $product): 
-                ?>
-                <div class="product-card premium">
-                    <?php if ($product['badge']): ?>
-                        <div class="product-badge"><?php echo $product['badge']; ?></div>
-                    <?php endif; ?>
-                    <div class="product-image">
-                        <span class="product-icon"><?php echo $product['icon']; ?></span>
-                    </div>
+            <div class="livestock-grid">
+                <div class="livestock-card">
+                    <img src="https://readdy.ai/api/search-image?query=Premium%20goat%20meat%20cuts%20displayed%20on%20wooden%20cutting%20board%2C%20professional%20butcher%20shop%20style%2C%20clean%20white%20background%2C%20high%20quality%20commercial%20food%20photography%2C%20natural%20lighting%2C%20rustic%20presentation&width=300&height=250&seq=goat001&orientation=landscape" alt="Goat" class="product-image">
                     <div class="product-content">
-                        <h3 class="product-title"><?php echo $product['title']; ?></h3>
-                        <p class="product-description"><?php echo $product['description']; ?></p>
-                        <div class="product-price">
-                            <span class="price-main">₱<?php echo $product['price']; ?></span>
-                            <span class="price-unit">/kg</span>
-                        </div>
-                        <div class="product-tags">
-                            <?php foreach ($product['tags'] as $tag): ?>
-                                <span class="product-tag"><?php echo $tag; ?></span>
-                            <?php endforeach; ?>
-                        </div>
-                        <button class="btn-add-to-cart" onclick="handleAddToCart('<?php echo $product['title']; ?>')">
-                            <i class="fas fa-cart-plus"></i>
-                            <?php echo isset($_SESSION['user_id']) ? 'Add to Cart' : 'View Details'; ?>
-                        </button>
+                        <h3>Goat</h3>
+                        <p>Premium goat meat</p>
+                        <div class="product-price">From $18/lb</div>
+                        <button class="btn-add-to-cart" onclick="<?php echo isset($_SESSION['user_id']) ? "alert('Order placed')" : "window.location='Register/login.php'"; ?>">Order Now</button>
                     </div>
                 </div>
-                <?php endforeach; ?>
-            </div>
 
-            <!-- Call to Action for Non-Logged-In Users -->
-            <?php if (!isset($_SESSION['user_id'])): ?>
-            <div class="text-center mt-5">
-                <div class="cta-box">
-                    <h3>Ready to Shop?</h3>
-                    <p>Create an account to start ordering fresh farm products</p>
-                    <div class="cta-actions">
-                        <a href="Register/index.php" class="btn btn-primary btn-lg">
-                            <i class="fas fa-user-plus me-2"></i>
-                            Sign Up Now
-                        </a>
-                        <a href="Register/login.php" class="btn btn-outline-primary btn-lg">
-                            <i class="fas fa-sign-in-alt me-2"></i>
-                            Login
-                        </a>
+                <div class="livestock-card">
+                    <img src="https://readdy.ai/api/search-image?query=Fresh%20pork%20cuts%20and%20chops%20arranged%20on%20wooden%20surface%2C%20professional%20butcher%20shop%20display%2C%20clean%20white%20background%2C%20high%20quality%20commercial%20food%20photography%2C%20natural%20lighting%2C%20premium%20meat%20presentation&width=300&height=250&seq=pork001&orientation=landscape" alt="Pork" class="product-image">
+                    <div class="product-content">
+                        <h3>Pork</h3>
+                        <p>Farm-raised pork</p>
+                        <div class="product-price">From $12/lb</div>
+                        <button class="btn-add-to-cart" onclick="<?php echo isset($_SESSION['user_id']) ? "alert('Order placed')" : "window.location='Register/login.php'"; ?>">Order Now</button>
+                    </div>
+                </div>
+
+                <div class="livestock-card">
+                    <img src="https://readdy.ai/api/search-image?query=Fresh%20whole%20chicken%20and%20chicken%20parts%20displayed%20on%20wooden%20cutting%20board%2C%20professional%20butcher%20shop%20style%2C%20clean%20white%20background%2C%20high%20quality%20commercial%20food%20photography%2C%20natural%20lighting&width=300&height=250&seq=chicken001&orientation=landscape" alt="Chicken" class="product-image">
+                    <div class="product-content">
+                        <h3>Chicken</h3>
+                        <p>Free-range chicken</p>
+                        <div class="product-price">From $8/lb</div>
+                        <button class="btn-add-to-cart" onclick="<?php echo isset($_SESSION['user_id']) ? "alert('Order placed')" : "window.location='Register/login.php'"; ?>">Order Now</button>
+                    </div>
+                </div>
+
+                <div class="livestock-card">
+                    <img src="https://readdy.ai/api/search-image?query=Premium%20beef%20steaks%20and%20cuts%20on%20wooden%20cutting%20board%2C%20professional%20butcher%20shop%20display%2C%20clean%20white%20background%2C%20high%20quality%20commercial%20food%20photography%2C%20natural%20lighting%2C%20marbled%20meat%20texture&width=300&height=250&seq=beef001&orientation=landscape" alt="Beef" class="product-image">
+                    <div class="product-content">
+                        <h3>Beef</h3>
+                        <p>Grass-fed beef</p>
+                        <div class="product-price">From $22/lb</div>
+                        <button class="btn-add-to-cart" onclick="<?php echo isset($_SESSION['user_id']) ? "alert('Order placed')" : "window.location='Register/login.php'"; ?>">Order Now</button>
                     </div>
                 </div>
             </div>
-            <?php endif; ?>
         </div>
     </section>
 
-    <!-- Seasonal Harvest Section -->
-    <section class="seasonal-section">
+    <!-- Seasonal Calendar Section -->
+    <section id="calendar" class="seasonal-section" style="background-color: rgba(255,255,255,0.5);">
         <div class="container">
-            <div class="section-header text-center">
-                <h2 class="section-title">Seasonal Harvest Calendar</h2>
-                <p class="section-subtitle">Enjoy produce at its peak flavor and nutritional value</p>
+            <div class="section-header">
+                <h2>Seasonal Harvest Calendar</h2>
+                <p>Know when your favorite produce is at its peak freshness and flavor</p>
             </div>
 
-            <div class="seasonal-grid">
-                <!-- Seasonal cards remain the same -->
-                <div class="season-card current">
-                    <div class="season-header">
-                        <h3 class="season-name">January</h3>
-                        <div class="season-badge">Current</div>
-                    </div>
-                    <div class="season-produce">
-                        <div class="produce-item">
-                            <span class="produce-icon">🍊</span>
-                            <span class="produce-name">Citrus Fruits</span>
-                        </div>
-                        <div class="produce-item">
-                            <span class="produce-icon">🥬</span>
-                            <span class="produce-name">Leafy Greens</span>
-                        </div>
-                        <div class="produce-item">
-                            <span class="produce-icon">🥕</span>
-                            <span class="produce-name">Root Vegetables</span>
-                        </div>
-                    </div>
+            <div class="calendar-grid">
+                <div class="month-card" style="background-color: #DBEAFE;">
+                    <h3>January</h3>
+                    <ul class="produce-list">
+                        <li class="produce-item"><i class="ri-leaf-line"></i> Winter Squash</li>
+                        <li class="produce-item"><i class="ri-leaf-line"></i> Citrus Fruits</li>
+                        <li class="produce-item"><i class="ri-leaf-line"></i> Root Vegetables</li>
+                    </ul>
                 </div>
 
-                <!-- ... other seasonal cards ... -->
+                <div class="month-card" style="background-color: #F3E8FF;">
+                    <h3>February</h3>
+                    <ul class="produce-list">
+                        <li class="produce-item"><i class="ri-leaf-line"></i> Cabbage</li>
+                        <li class="produce-item"><i class="ri-leaf-line"></i> Leeks</li>
+                        <li class="produce-item"><i class="ri-leaf-line"></i> Potatoes</li>
+                    </ul>
+                </div>
+
+                <div class="month-card" style="background-color: #DCFCE7;">
+                    <h3>March</h3>
+                    <ul class="produce-list">
+                        <li class="produce-item"><i class="ri-leaf-line"></i> Asparagus</li>
+                        <li class="produce-item"><i class="ri-leaf-line"></i> Peas</li>
+                        <li class="produce-item"><i class="ri-leaf-line"></i> Radishes</li>
+                    </ul>
+                </div>
+
+                <div class="month-card" style="background-color: #FEF3C7;">
+                    <h3>April</h3>
+                    <ul class="produce-list">
+                        <li class="produce-item"><i class="ri-leaf-line"></i> Artichokes</li>
+                        <li class="produce-item"><i class="ri-leaf-line"></i> Spinach</li>
+                        <li class="produce-item"><i class="ri-leaf-line"></i> Spring Onions</li>
+                    </ul>
+                </div>
+
+                <div class="month-card" style="background-color: #FCE7F3;">
+                    <h3>May</h3>
+                    <ul class="produce-list">
+                        <li class="produce-item"><i class="ri-leaf-line"></i> Strawberries</li>
+                        <li class="produce-item"><i class="ri-leaf-line"></i> Lettuce</li>
+                        <li class="produce-item"><i class="ri-leaf-line"></i> Rhubarb</li>
+                    </ul>
+                </div>
+
+                <div class="month-card" style="background-color: #FEE2E2;">
+                    <h3>June</h3>
+                    <ul class="produce-list">
+                        <li class="produce-item"><i class="ri-leaf-line"></i> Berries</li>
+                        <li class="produce-item"><i class="ri-leaf-line"></i> Cherries</li>
+                        <li class="produce-item"><i class="ri-leaf-line"></i> Early Tomatoes</li>
+                    </ul>
+                </div>
+
+                <div class="month-card" style="background-color: #FFEDD5;">
+                    <h3>July</h3>
+                    <ul class="produce-list">
+                        <li class="produce-item"><i class="ri-leaf-line"></i> Corn</li>
+                        <li class="produce-item"><i class="ri-leaf-line"></i> Peaches</li>
+                        <li class="produce-item"><i class="ri-leaf-line"></i> Summer Squash</li>
+                    </ul>
+                </div>
+
+                <div class="month-card" style="background-color: #E0E7FF;">
+                    <h3>August</h3>
+                    <ul class="produce-list">
+                        <li class="produce-item"><i class="ri-leaf-line"></i> Melons</li>
+                        <li class="produce-item"><i class="ri-leaf-line"></i> Peppers</li>
+                        <li class="produce-item"><i class="ri-leaf-line"></i> Eggplant</li>
+                    </ul>
+                </div>
+
+                <div class="month-card" style="background-color: #FEF08A;">
+                    <h3>September</h3>
+                    <ul class="produce-list">
+                        <li class="produce-item"><i class="ri-leaf-line"></i> Apples</li>
+                        <li class="produce-item"><i class="ri-leaf-line"></i> Pumpkins</li>
+                        <li class="produce-item"><i class="ri-leaf-line"></i> Grapes</li>
+                    </ul>
+                </div>
+
+                <div class="month-card" style="background-color: #FED7AA;">
+                    <h3>October</h3>
+                    <ul class="produce-list">
+                        <li class="produce-item"><i class="ri-leaf-line"></i> Sweet Potatoes</li>
+                        <li class="produce-item"><i class="ri-leaf-line"></i> Cranberries</li>
+                        <li class="produce-item"><i class="ri-leaf-line"></i> Brussels Sprouts</li>
+                    </ul>
+                </div>
+
+                <div class="month-card" style="background-color: #FEF3C7;">
+                    <h3>November</h3>
+                    <ul class="produce-list">
+                        <li class="produce-item"><i class="ri-leaf-line"></i> Turnips</li>
+                        <li class="produce-item"><i class="ri-leaf-line"></i> Parsnips</li>
+                        <li class="produce-item"><i class="ri-leaf-line"></i> Late Harvest</li>
+                    </ul>
+                </div>
+
+                <div class="month-card" style="background-color: #DCFCE7;">
+                    <h3>December</h3>
+                    <ul class="produce-list">
+                        <li class="produce-item"><i class="ri-leaf-line"></i> Winter Greens</li>
+                        <li class="produce-item"><i class="ri-leaf-line"></i> Stored Apples</li>
+                        <li class="produce-item"><i class="ri-leaf-line"></i> Preserved Foods</li>
+                    </ul>
+                </div>
             </div>
         </div>
     </section>
-
-    <!-- Newsletter Section -->
-    <section class="newsletter-section">
-        <div class="container">
-            <div class="newsletter-content">
-                <h2>Stay Updated with Fresh Harvests</h2>
-                <p>Get notified about seasonal offers and new arrivals</p>
-                <form class="newsletter-form">
-                    <div class="input-group">
-                        <input type="email" placeholder="Enter your email" class="form-control" required>
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-paper-plane me-2"></i>
-                            Subscribe
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </section>
-
-    <!-- Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
-
-    <script>
-        // Auto-show store modal only if user is eligible and logged in
-        document.addEventListener('DOMContentLoaded', function() {
-            <?php if (isset($_SESSION['user_id']) && $user_role === 'customer' && $can_create_store): ?>
-            var storeModal = new bootstrap.Modal(document.getElementById('storeModal'));
-            storeModal.show();
-            <?php endif; ?>
-        });
-
-        function scrollToCategories() {
-            document.getElementById('categories').scrollIntoView({ 
-                behavior: 'smooth' 
-            });
-        }
-
-        function handleAddToCart(productName) {
-            <?php if (!isset($_SESSION['user_id'])): ?>
-                // Redirect to login if not logged in
-                window.location.href = '../auth/login.php?redirect=' + encodeURIComponent(window.location.pathname);
-            <?php else: ?>
-                // Add to cart logic for logged-in users
-                console.log('Adding to cart:', productName);
-                // Implement your add to cart functionality here
-            <?php endif; ?>
-        }
-
-        function showCategory(category) {
-            <?php if (!isset($_SESSION['user_id'])): ?>
-                window.location.href = '../auth/login.php?category=' + category;
-            <?php else: ?>
-                // Navigate to category for logged-in users
-                console.log('Showing category:', category);
-            <?php endif; ?>
-        }
-
-        function showAllCategories() {
-            <?php if (!isset($_SESSION['user_id'])): ?>
-                window.location.href = '../auth/login.php';
-            <?php else: ?>
-                // Show all categories for logged-in users
-                console.log('Showing all categories');
-            <?php endif; ?>
-        }
-    </script>
+    <script src="Assets/js/index.js"></script>
 </body>
 </html>
