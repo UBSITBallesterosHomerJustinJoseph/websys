@@ -2,12 +2,18 @@
 session_start();
 include '../../db_connect.php';
 
+// Require login to view orders
 $userId = $_SESSION['user_id'] ?? null;
+if (!$userId) {
+    header('Location: ../../Register/login.php?redirect=' . urlencode('/websys/Pages/customer/checkorders.php'));
+    exit;
+}
+
 $orders = [];
 
 if ($userId) {
     $sql = "
-        SELECT order_id, status, created_at, total_amount, payment_method, payment_status, shipping_address, order_notes
+        SELECT DISTINCT order_id, status, created_at, total_amount, payment_method, payment_status, shipping_address, order_notes
         FROM orders
         WHERE customer_id = ?
         ORDER BY created_at DESC
@@ -22,25 +28,35 @@ if ($userId) {
     $stmt->execute();
     $result = $stmt->get_result();
     while ($row = $result->fetch_assoc()) {
-        // Fetch order items for each order
+        // Fetch order items for each order - use LEFT JOIN in case lot doesn't exist
         $itemsSql = "
-            SELECT oi.order_item_id, oi.quantity, oi.unit_price, oi.subtotal,
-                   p.product_name, p.unit_type,
-                   il.lot_number
+            SELECT 
+                oi.order_item_id, 
+                oi.quantity, 
+                oi.unit_price, 
+                oi.subtotal,
+                COALESCE(p.product_name, 'Product') as product_name,
+                COALESCE(p.unit_type, 'unit') as unit_type,
+                COALESCE(il.lot_number, 'N/A') as lot_number
             FROM order_items oi
-            JOIN inventory_lots il ON oi.lot_id = il.lot_id
-            JOIN products p ON il.product_id = p.product_id
+            LEFT JOIN inventory_lots il ON oi.lot_id = il.lot_id
+            LEFT JOIN products p ON il.product_id = p.product_id
             WHERE oi.order_id = ?
         ";
+        
         $itemsStmt = $farmcart->conn->prepare($itemsSql);
-        $itemsStmt->bind_param("i", $row['order_id']);
-        $itemsStmt->execute();
-        $itemsResult = $itemsStmt->get_result();
-        $row['items'] = [];
-        while ($item = $itemsResult->fetch_assoc()) {
-            $row['items'][] = $item;
+        if ($itemsStmt) {
+            $itemsStmt->bind_param("i", $row['order_id']);
+            $itemsStmt->execute();
+            $itemsResult = $itemsStmt->get_result();
+            $row['items'] = [];
+            while ($item = $itemsResult->fetch_assoc()) {
+                $row['items'][] = $item;
+            }
+            $itemsStmt->close();
+        } else {
+            $row['items'] = [];
         }
-        $itemsStmt->close();
         
         $orders[] = $row;
     }

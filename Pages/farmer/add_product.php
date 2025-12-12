@@ -70,18 +70,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_product'])) {
         $error = "Please fill in all required fields with valid values.";
     } elseif ($initial_quantity <= 0) {
         $error = "Please provide an initial quantity greater than zero.";
-    } elseif ($expiration_duration_seconds <= 0) {
-        $error = "Please provide an expiration duration greater than zero.";
     } elseif (!$has_image) {
         $error = "Product image is required.";
     } else {
+        // Set expiration_duration_seconds to 0 if not provided (no expiration)
+        if ($expiration_duration_seconds <= 0) {
+            $expiration_duration_seconds = 0;
+        }
         // Insert product with pending approval status and not listed
         $sql = "INSERT INTO products (product_name, description, category_id, unit_type, base_price, quantity, created_by, approval_status, is_active, is_listed, expiration_duration_seconds, is_expired)
                 VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', TRUE, FALSE, ?, 0)";
         $stmt = $farmcart->conn->prepare($sql);
 
         if ($stmt) {
-            $stmt->bind_param("ssisdiisi", $product_name, $description, $category_id, $unit_type, $base_price, $initial_quantity, $farmer_id, $expiration_duration_seconds);
+            $stmt->bind_param("ssisdiii", $product_name, $description, $category_id, $unit_type, $base_price, $initial_quantity, $farmer_id, $expiration_duration_seconds);
 
             if ($stmt->execute()) {
                 $product_id = $stmt->insert_id;
@@ -337,7 +339,7 @@ function sendAdminNotification($product_id, $product_name, $farmer_id, $farmer_n
                   </div>
 
                   <div class="col-12">
-                    <label class="form-label fw-semibold required-field">Expiration Duration</label>
+                    <label class="form-label fw-semibold">Expiration Duration (Optional)</label>
                     <div class="row g-2">
                       <div class="col-6 col-md-3">
                         <div class="input-group input-group-sm">
@@ -364,7 +366,7 @@ function sendAdminNotification($product_id, $product_name, $farmer_id, $farmer_n
                         </div>
                       </div>
                     </div>
-                    <div class="form-text">Product will expire after admin approval using this duration (months counted as 30 days).</div>
+                    <div class="form-text">Product will expire after admin approval using this duration (months counted as 30 days). Leave all fields as 0 for no expiration.</div>
                   </div>
 
                   <div class="col-12">

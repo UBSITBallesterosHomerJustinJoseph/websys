@@ -65,8 +65,10 @@ $low_stock = $sidebar_stats['low_stock'] ?? 0;
             <li class="nav-item mb-2">
                 <a class="nav-link sidebar-link <?php echo ($current_page == 'orders.php') ? 'active' : ''; ?>" href="orders.php">
                     <i class="fas fa-shopping-cart me-2"></i>
-                    Orders
-                    <span class="badge bg-warning float-end"><?= $pending_orders ?></span>
+                    Manage Orders
+                    <?php if ($pending_orders > 0): ?>
+                        <span class="badge bg-warning float-end"><?= $pending_orders ?></span>
+                    <?php endif; ?>
                 </a>
             </li>
             
@@ -88,28 +90,12 @@ $low_stock = $sidebar_stats['low_stock'] ?? 0;
             </li>
             
             <li class="nav-item mb-2">
-                <a class="nav-link sidebar-link <?php echo ($current_page == 'orders.php') ? 'active' : ''; ?>" href="orders.php">
-                    <i class="fas fa-shopping-cart me-2"></i>
-                    Orders
-                    <?php if (isset($sidebar_stats['pending_orders']) && $sidebar_stats['pending_orders'] > 0): ?>
-                        <span class="badge bg-danger float-end"><?= $sidebar_stats['pending_orders']; ?></span>
-                    <?php endif; ?>
-                </a>
-            </li>
-            
-            <li class="nav-item mb-2">
                 <a class="nav-link sidebar-link <?php echo ($current_page == 'analytics.php') ? 'active' : ''; ?>" href="analytics.php">
                     <i class="fas fa-chart-line me-2"></i>
                     Analytics
                 </a>
             </li>
             
-            <li class="nav-item mb-2">
-                <a class="nav-link sidebar-link <?php echo ($current_page == 'reviews.php') ? 'active' : ''; ?>" href="reviews.php">
-                    <i class="fas fa-star me-2"></i>
-                    Reviews
-                </a>
-            </li>
         </ul>
 
         <!-- Quick Stats -->

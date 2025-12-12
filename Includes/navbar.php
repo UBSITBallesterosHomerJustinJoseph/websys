@@ -90,8 +90,39 @@ $is_setup_store_page = strpos($current_page, 'setUpStore.php') !== false ||
                        strpos($current_page, 'setup-store.php') !== false;
 
 // Determine if navbar should start with solid color
+$is_orders_page = strpos($current_page, 'orders.php') !== false || 
+                  strpos($current_page, 'checkorders.php') !== false;
+$is_checkout_page = strpos($current_page, 'checkout.php') !== false;
+$is_cart_page = strpos($current_page, 'cart.php') !== false;
 $start_solid = $is_products_page || $is_about_page || $is_contact_page || 
-               $is_profile_page || $is_edit_profile_page || $is_setup_store_page;
+               $is_profile_page || $is_edit_profile_page || $is_setup_store_page ||
+               $is_orders_page || $is_checkout_page || $is_cart_page;
+
+// Get cart count for logged-in users and guests
+$cart_count = 0;
+$cart_path = $base_url . 'Pages/customer/cart.php';
+
+if ($is_logged_in && isset($farmcart)) {
+    // Count items in database cart
+    $cart_count_query = $farmcart->conn->prepare("SELECT SUM(quantity) as total FROM carts WHERE user_id = ?");
+    if ($cart_count_query) {
+        $cart_count_query->bind_param("i", $_SESSION['user_id']);
+        $cart_count_query->execute();
+        $cart_result = $cart_count_query->get_result();
+        if ($cart_row = $cart_result->fetch_assoc()) {
+            $cart_count = (int)($cart_row['total'] ?? 0);
+        }
+        $cart_count_query->close();
+    }
+} else {
+    // Count items in guest cart
+    $guest_cart = $_SESSION['guest_cart'] ?? [];
+    foreach ($guest_cart as $item) {
+        if (isset($item['quantity'])) {
+            $cart_count += (int)$item['quantity'];
+        }
+    }
+}
 ?>
 
 <style>
@@ -101,19 +132,30 @@ $start_solid = $is_products_page || $is_about_page || $is_contact_page ||
         top: 0;
         left: 0;
         right: 0;
-        z-index: 50;
+        z-index: 1000;
         transition: all 0.3s ease;
-        <?php if ($start_solid): ?>
-        background: rgba(15, 46, 21, 0.95);
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        <?php else: ?>
         background: transparent;
-        <?php endif; ?>
+        box-shadow: none;
     }
     
     nav.scrolled {
-        background: rgba(15, 46, 21, 0.95);
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        background: #0F2E15;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    }
+    
+    /* Add padding to body to prevent content from going under navbar */
+    body {
+        padding-top: 4rem !important;
+    }
+    
+    /* Ensure main content areas have proper spacing */
+    main, .container, .checkout-container, .cart-container {
+        margin-top: 0;
+    }
+    
+    nav.scrolled {
+        background: #0F2E15;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.2);
     }
     
     .nav-container {
@@ -496,7 +538,7 @@ $start_solid = $is_products_page || $is_about_page || $is_contact_page ||
         color: #0F2E15 !important;
     }
     
-    .setup-store-highlight .ri-sparkling-line {
+    .setup-store-highlight .fa-star {
         color: #0F2E15 !important;
     }
     
@@ -526,6 +568,44 @@ $start_solid = $is_products_page || $is_about_page || $is_contact_page ||
         display: flex;
         gap: 1rem;
         align-items: center;
+    }
+    
+    /* Cart Icon Link */
+    .cart-icon-link {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1.5rem;
+        text-decoration: none;
+        padding: 0.5rem;
+        border-radius: 0.375rem;
+        transition: all 0.3s ease;
+        width: 40px;
+        height: 40px;
+    }
+    
+    .cart-icon-link:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+        color: #DAE2CB;
+        transform: scale(1.1);
+    }
+    
+    .cart-badge {
+        position: absolute;
+        top: 0;
+        right: 0;
+        background-color: #dc2626;
+        color: white;
+        font-size: 0.75rem;
+        font-weight: 700;
+        padding: 0.125rem 0.375rem;
+        border-radius: 9999px;
+        min-width: 18px;
+        text-align: center;
+        line-height: 1.2;
+        border: 2px solid #0F2E15;
     }
     
     /* Sign In button */
@@ -592,7 +672,7 @@ $start_solid = $is_products_page || $is_about_page || $is_contact_page ||
     
     /* Mobile responsive adjustments for dropdown */
     @media (max-width: 640px) {
-        .user-dropdown-btn span:not(.ri-arrow-down-s-line) {
+        .user-dropdown-btn span:not(.fa-chevron-down) {
             display: none;
         }
         
@@ -663,7 +743,7 @@ $start_solid = $is_products_page || $is_about_page || $is_contact_page ||
             <form class="search-form" id="searchForm">
                 <input type="text" class="search-input" placeholder="Search products..." id="searchInput">
                 <button type="submit" class="search-btn">
-                    <i class="ri-search-line"></i>
+                    <i class="fas fa-search"></i>
                 </button>
                 <div class="search-suggestions" id="searchSuggestions">
                     <!-- Search suggestions remain the same -->
@@ -671,6 +751,14 @@ $start_solid = $is_products_page || $is_about_page || $is_contact_page ||
             </form>
             
             <div class="nav-actions">
+                <!-- Cart Icon with Badge -->
+                <a href="<?php echo $cart_path; ?>" class="cart-icon-link" title="View Cart">
+                    <i class="fas fa-shopping-cart"></i>
+                    <?php if ($cart_count > 0): ?>
+                        <span class="cart-badge"><?php echo $cart_count > 99 ? '99+' : $cart_count; ?></span>
+                    <?php endif; ?>
+                </a>
+                
                 <?php if (!$is_logged_in): ?>
                     <a href="<?php echo $register_path; ?>" class="sign-in-btn">Sign Up</a>
                 <?php else: ?>
@@ -707,9 +795,9 @@ $start_solid = $is_products_page || $is_about_page || $is_contact_page ||
                         
                         <button class="user-dropdown-btn <?php echo $is_on_account_page ? 'account-active-nav' : ''; ?>" 
                                 type="button" id="userDropdown" onclick="toggleDropdown()">
-                            <i class="ri-user-circle-line"></i> 
+                            <i class="fas fa-user-circle"></i> 
                             <span class="truncate"><?php echo htmlspecialchars($display_name); ?></span>
-                            <i class="ri-arrow-down-s-line ml-auto"></i>
+                            <i class="fas fa-chevron-down ml-auto"></i>
                         </button>
                         
                         <div class="dropdown-menu" id="dropdownMenu">
@@ -728,52 +816,52 @@ $start_solid = $is_products_page || $is_about_page || $is_contact_page ||
                             <?php if ($user_role === 'farmer'): ?>
                                 <div class="dropdown-header">Farmer Dashboard</div>
                                 <a href="<?php echo $farmer_dashboard_path; ?>" class="dropdown-item">
-                                    <i class="ri-dashboard-line"></i> 
+                                    <i class="fas fa-tachometer-alt"></i> 
                                     <span>Dashboard</span>
                                 </a>
                                 <a href="<?php echo $profile_path; ?>" class="dropdown-item <?php echo $is_profile_page ? 'active' : ''; ?>">
-                                    <i class="ri-user-line"></i> 
+                                    <i class="fas fa-user"></i> 
                                     <span>Profile</span>
                                 </a>
                                 <a href="<?php echo $orders_path; ?>" class="dropdown-item">
-                                    <i class="ri-shopping-cart-line"></i> 
+                                    <i class="fas fa-shopping-cart"></i> 
                                     <span>Orders</span>
                                 </a>
                                 
                             <?php elseif ($user_role === 'admin'): ?>
                                 <div class="dropdown-header">Admin Panel</div>
                                 <a href="<?php echo $admin_dashboard_path; ?>" class="dropdown-item">
-                                    <i class="ri-dashboard-line"></i> 
+                                    <i class="fas fa-tachometer-alt"></i> 
                                     <span>Admin Dashboard</span>
                                 </a>
                                 <a href="<?php echo $profile_path; ?>" class="dropdown-item <?php echo $is_profile_page ? 'active' : ''; ?>">
-                                    <i class="ri-user-line"></i> 
+                                    <i class="fas fa-user"></i> 
                                     <span>Profile</span>
                                 </a>
                                 <a href="<?php echo $edit_profile_path; ?>" class="dropdown-item <?php echo $is_edit_profile_page ? 'active' : ''; ?>">
-                                    <i class="ri-edit-line"></i> 
+                                    <i class="fas fa-edit"></i> 
                                     <span>Edit Profile</span>
                                 </a>
                                 
                             <?php else: ?>
                                 <div class="dropdown-header">My Account</div>
                                 <a href="<?php echo $profile_path; ?>" class="dropdown-item <?php echo $is_profile_page ? 'active' : ''; ?>">
-                                    <i class="ri-user-line"></i> 
+                                    <i class="fas fa-user"></i> 
                                     <span>Profile</span>
                                 </a>
                                 <a href="<?php echo $edit_profile_path; ?>" class="dropdown-item <?php echo $is_edit_profile_page ? 'active' : ''; ?>">
-                                    <i class="ri-edit-line"></i> 
+                                    <i class="fas fa-edit"></i> 
                                     <span>Edit Profile</span>
                                 </a>
                                 <a href="<?php echo $orders_path; ?>" class="dropdown-item">
-                                    <i class="ri-shopping-cart-line"></i> 
+                                    <i class="fas fa-shopping-cart"></i> 
                                     <span>My Orders</span>
                                 </a>
                                 <?php if ($can_create_store): ?>
                                     <a href="<?php echo $setup_store_path; ?>" class="dropdown-item setup-store-highlight <?php echo $is_setup_store_page ? 'active' : ''; ?>">
-                                        <i class="ri-store-2-line"></i> 
+                                        <i class="fas fa-store"></i> 
                                         <span>Setup Your Store</span>
-                                        <i class="ri-sparkling-line"></i>
+                                        <i class="fas fa-star"></i>
                                     </a>
                                 <?php endif; ?>
                             <?php endif; ?>
@@ -782,7 +870,7 @@ $start_solid = $is_products_page || $is_about_page || $is_contact_page ||
                             
                             <!-- Logout -->
                             <a href="<?php echo $logout_path; ?>" class="dropdown-item logout-item">
-                                <i class="ri-logout-circle-line"></i> 
+                                <i class="fas fa-sign-out-alt"></i> 
                                 <span>Logout</span>
                             </a>
                         </div>
@@ -791,7 +879,7 @@ $start_solid = $is_products_page || $is_about_page || $is_contact_page ||
             </div>
             
             <button class="nav-menu-toggle" onclick="toggleMenu()">
-                <i class="ri-menu-line"></i>
+                <i class="fas fa-bars"></i>
             </button>
         </div>
     </nav>

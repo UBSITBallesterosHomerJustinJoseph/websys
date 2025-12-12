@@ -8,6 +8,7 @@ $is_logged_in = isset($_SESSION['user_id']) && !empty($_SESSION['user_id']);
 $category_param = $_GET['category'] ?? '';
 $category_type = $_GET['type'] ?? '';
 $category_id = null;
+$search_term = $_GET['search'] ?? '';
 
 // Fetch all categories for dropdown
 $all_categories = [];
@@ -108,21 +109,60 @@ $products_query = "SELECT
 
 // Filter by category if not 'all'
 $stmt = null;
+$has_where = true;
+
+// Add search filter if search term exists
+if (!empty($search_term)) {
+    $products_query .= " AND (p.product_name LIKE ? OR p.description LIKE ? OR c.category_name LIKE ?)";
+    $search_pattern = "%{$search_term}%";
+}
+
 if (!empty($category_type) && $category_type !== 'all') {
     $products_query .= " AND c.category_type = ?";
-    $stmt = $farmcart->conn->prepare($products_query);
-    if ($stmt) {
-        $stmt->bind_param("s", $category_type);
-        $stmt->execute();
-        $products_result = $stmt->get_result();
+    if (!empty($search_term)) {
+        $stmt = $farmcart->conn->prepare($products_query);
+        if ($stmt) {
+            $stmt->bind_param("ssss", $search_pattern, $search_pattern, $search_pattern, $category_type);
+            $stmt->execute();
+            $products_result = $stmt->get_result();
+        } else {
+            $products_result = false;
+        }
     } else {
-        $products_result = false;
+        $stmt = $farmcart->conn->prepare($products_query);
+        if ($stmt) {
+            $stmt->bind_param("s", $category_type);
+            $stmt->execute();
+            $products_result = $stmt->get_result();
+        } else {
+            $products_result = false;
+        }
     }
 } elseif (!empty($category_id)) {
     $products_query .= " AND p.category_id = ?";
+    if (!empty($search_term)) {
+        $stmt = $farmcart->conn->prepare($products_query);
+        if ($stmt) {
+            $stmt->bind_param("sssi", $search_pattern, $search_pattern, $search_pattern, $category_id);
+            $stmt->execute();
+            $products_result = $stmt->get_result();
+        } else {
+            $products_result = false;
+        }
+    } else {
+        $stmt = $farmcart->conn->prepare($products_query);
+        if ($stmt) {
+            $stmt->bind_param("i", $category_id);
+            $stmt->execute();
+            $products_result = $stmt->get_result();
+        } else {
+            $products_result = false;
+        }
+    }
+} elseif (!empty($search_term)) {
     $stmt = $farmcart->conn->prepare($products_query);
     if ($stmt) {
-        $stmt->bind_param("i", $category_id);
+        $stmt->bind_param("sss", $search_pattern, $search_pattern, $search_pattern);
         $stmt->execute();
         $products_result = $stmt->get_result();
     } else {
@@ -225,7 +265,11 @@ if ($products_result) {
                 <div class="row align-items-center">
                     <div class="col-md-6">
                         <h2 class="section-title">Available Products</h2>
-                        <p class="text-muted">Showing <?php echo count($products); ?> product<?php echo count($products) != 1 ? 's' : ''; ?></p>
+                        <?php if (!empty($search_term)): ?>
+                            <p class="text-muted">Search results for "<strong><?php echo htmlspecialchars($search_term); ?></strong>" - <?php echo count($products); ?> product<?php echo count($products) != 1 ? 's' : ''; ?> found</p>
+                        <?php else: ?>
+                            <p class="text-muted">Showing <?php echo count($products); ?> product<?php echo count($products) != 1 ? 's' : ''; ?></p>
+                        <?php endif; ?>
                     </div>
                     <div class="col-md-6 text-end">
                         <div class="sorting-options">
@@ -352,14 +396,16 @@ if ($products_result) {
                         </div>
                     <?php endforeach; ?>
                 <?php else: ?>
-                    <div class="no-products">
-                        <div class="no-products-icon">📦</div>
-                        <h3>No Products Available</h3>
-                        <p>We're working on adding more products to this category.</p>
-                        <a href="index.php" class="btn btn-primary">
-                            <i class="fas fa-arrow-left me-2"></i>
-                            Back to Home
-                        </a>
+                    <div class="col-12">
+                        <div class="text-center py-5">
+                            <i class="fas fa-box-open fa-4x text-muted mb-3"></i>
+                            <h3>No Products Yet</h3>
+                            <p class="text-muted">Check back soon for products in this category.</p>
+                            <a href="index.php" class="btn btn-primary mt-3">
+                                <i class="fas fa-arrow-left me-2"></i>
+                                Back to Home
+                            </a>
+                        </div>
                     </div>
                 <?php endif; ?>
             </div>
@@ -496,6 +542,9 @@ if ($products_result) {
 
         // Add to Cart Function
         function addToCart(productId, availableQuantity, evt) {
+            evt.preventDefault();
+            evt.stopPropagation();
+            
             // Get the button that was clicked
             const btn = evt ? evt.target.closest('button') : (window.event ? window.event.target.closest('button') : null);
             if (!btn) {
@@ -548,6 +597,9 @@ if ($products_result) {
                         btn.classList.add('btn-success');
                         btn.disabled = false;
                     }, 2000);
+                } else if (data.redirect) {
+                    // Redirect to register page if not logged in
+                    window.location.href = data.redirect;
                 } else {
                     alert(data.message || 'Failed to add product to cart.');
                     btn.innerHTML = originalText;

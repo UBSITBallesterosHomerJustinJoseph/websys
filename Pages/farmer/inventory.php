@@ -33,13 +33,27 @@ try {
         throw new Exception("Inventory table not found. Please check your database setup.");
     }
 
-    // Fetch inventory lots with error handling
-    $inventory_sql = "SELECT il.*, p.product_name, p.product_image, c.category_name
-                     FROM inventory_lots il
-                     JOIN products p ON il.product_id = p.product_id
+    // Fetch products with inventory information
+    $inventory_sql = "SELECT 
+                        p.product_id,
+                        p.product_name,
+                        p.quantity as stock_quantity,
+                        p.base_price,
+                        p.unit_type,
+                        p.expires_at,
+                        p.created_at,
+                        p.approval_status,
+                        c.category_name,
+                        pi.image_url as product_image,
+                        COUNT(DISTINCT il.lot_id) as lot_count,
+                        COALESCE(SUM(il.available_quantity), 0) as total_lot_quantity
+                     FROM products p
                      LEFT JOIN categories c ON p.category_id = c.category_id
-                     WHERE il.farmer_id = ?
-                     ORDER BY il.created_at DESC";
+                     LEFT JOIN product_images pi ON p.product_id = pi.product_id AND pi.is_primary = TRUE
+                     LEFT JOIN inventory_lots il ON p.product_id = il.product_id AND il.farmer_id = ?
+                     WHERE p.created_by = ?
+                     GROUP BY p.product_id, p.product_name, p.quantity, p.base_price, p.unit_type, p.expires_at, p.created_at, p.approval_status, c.category_name, pi.image_url
+                     ORDER BY p.created_at DESC";
     
     $inventory_stmt = $farmcart->conn->prepare($inventory_sql);
     
@@ -47,7 +61,7 @@ try {
         throw new Exception("Failed to prepare statement: " . $farmcart->conn->error);
     }
     
-    $inventory_stmt->bind_param("i", $farmer_id);
+    $inventory_stmt->bind_param("ii", $farmer_id, $farmer_id);
     
     if (!$inventory_stmt->execute()) {
         throw new Exception("Failed to execute query: " . $inventory_stmt->error);
@@ -249,45 +263,81 @@ try {
                   <tr>
                     <th>Product</th>
                     <th>Category</th>
-                    <th>Lot Number</th>
-                    <th>Quantity</th>
-                    <th>Status</th>
-                    <th>Harvest Date</th>
+                    <th>Stock Quantity</th>
+                    <th>Unit Type</th>
+                    <th>Price</th>
+                    <th>Approval Status</th>
                     <th>Expiry Date</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   <?php while ($item = $inventory_result->fetch_assoc()): ?>
+                    <?php
+                    $image_url = !empty($item['product_image']) ? $item['product_image'] : '';
+                    if (!empty($image_url) && !preg_match('/^https?:\/\//', $image_url)) {
+                        if (strpos($image_url, 'uploads/') === 0) {
+                            $image_url = '../farmer/' . $image_url;
+                        }
+                    }
+                    $stock_qty = (int)($item['stock_quantity'] ?? 0);
+                    $expiry_date = !empty($item['expires_at']) ? date('M d, Y h:i A', strtotime($item['expires_at'])) : 'No expiry set';
+                    $is_expired = !empty($item['expires_at']) && strtotime($item['expires_at']) < time();
+                    ?>
                     <tr>
                       <td>
                         <div class="d-flex align-items-center">
-                          <?php if (!empty($item['product_image'])): ?>
-                            <img src="../<?= $item['product_image'] ?>" class="product-image me-2" alt="<?= htmlspecialchars($item['product_name']) ?>">
-                          <?php else: ?>
-                            <div class="product-image bg-light d-flex align-items-center justify-content-center me-2">
-                              <i class="fas fa-image text-muted"></i>
-                            </div>
+                          <?php if (!empty($image_url)): ?>
+                            <img src="<?= htmlspecialchars($image_url) ?>" class="product-image me-2" alt="<?= htmlspecialchars($item['product_name']) ?>" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
                           <?php endif; ?>
-                          <?= htmlspecialchars($item['product_name']) ?>
+                          <div class="product-image bg-light d-flex align-items-center justify-content-center me-2" style="<?= !empty($image_url) ? 'display:none;' : '' ?>">
+                            <i class="fas fa-image text-muted"></i>
+                          </div>
+                          <div>
+                            <strong><?= htmlspecialchars($item['product_name']) ?></strong>
+                            <?php if ($item['lot_count'] > 0): ?>
+                              <br><small class="text-muted"><?= $item['lot_count'] ?> lot(s)</small>
+                            <?php endif; ?>
+                          </div>
                         </div>
                       </td>
                       <td><?= htmlspecialchars($item['category_name'] ?? 'Uncategorized') ?></td>
-                      <td><?= htmlspecialchars($item['lot_number'] ?? 'N/A') ?></td>
                       <td>
                         <span class="badge bg-<?= 
-                          ($item['available_quantity'] ?? 0) == 0 ? 'danger' : 
-                          (($item['available_quantity'] ?? 0) < 10 ? 'warning' : 'success')
+                          $stock_qty == 0 ? 'danger' : 
+                          ($stock_qty < 10 ? 'warning' : 'success')
                         ?>">
-                          <?= $item['available_quantity'] ?? 0 ?>
+                          <?= number_format($stock_qty, 0) ?>
+                        </span>
+                        <?php if ($item['total_lot_quantity'] > 0): ?>
+                          <br><small class="text-muted">Lots: <?= number_format($item['total_lot_quantity'], 0) ?></small>
+                        <?php endif; ?>
+                      </td>
+                      <td><?= htmlspecialchars($item['unit_type'] ?? 'unit') ?></td>
+                      <td>₱<?= number_format($item['base_price'] ?? 0, 2) ?></td>
+                      <td>
+                        <span class="badge bg-<?= 
+                          $item['approval_status'] == 'approved' ? 'success' : 
+                          ($item['approval_status'] == 'pending' ? 'warning' : 'danger')
+                        ?>">
+                          <?= ucfirst($item['approval_status'] ?? 'unknown') ?>
                         </span>
                       </td>
                       <td>
-                        <span class="badge bg-<?= ($item['status'] ?? '') == 'active' ? 'success' : 'secondary' ?>">
-                          <?= ucfirst($item['status'] ?? 'unknown') ?>
-                        </span>
+                        <?php if ($is_expired): ?>
+                          <span class="text-danger">
+                            <i class="fas fa-exclamation-triangle"></i> Expired
+                            <br><small><?= $expiry_date ?></small>
+                          </span>
+                        <?php else: ?>
+                          <?= $expiry_date ?>
+                        <?php endif; ?>
                       </td>
-                      <td><?= !empty($item['harvest_date']) ? date('M d, Y', strtotime($item['harvest_date'])) : 'N/A' ?></td>
-                      <td><?= !empty($item['expiry_date']) ? date('M d, Y', strtotime($item['expiry_date'])) : 'N/A' ?></td>
+                      <td>
+                        <a href="products.php?edit=<?= $item['product_id'] ?>" class="btn btn-sm btn-outline-primary" title="Edit Product">
+                          <i class="fas fa-edit"></i>
+                        </a>
+                      </td>
                     </tr>
                   <?php endwhile; ?>
                 </tbody>

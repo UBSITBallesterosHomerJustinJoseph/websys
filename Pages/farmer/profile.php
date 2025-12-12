@@ -1,7 +1,7 @@
 <?php
 session_start();
 include '../../db_connect.php';
-require_once 'User.php';
+require_once '../customer/User.php';
 
 // Guard: must be logged in
 if (!isset($_SESSION['user_id'])) {

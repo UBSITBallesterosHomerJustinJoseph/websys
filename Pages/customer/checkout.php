@@ -4,11 +4,47 @@ include '../../db_connect.php';
 
 $userId = $_SESSION['user_id'] ?? null;
 
-// Require login for checkout
+// Require login for checkout - but preserve guest cart
 if (!$userId) {
+    // Save guest cart in session before redirecting
+    if (isset($_SESSION['guest_cart']) && !empty($_SESSION['guest_cart'])) {
+        $_SESSION['guest_cart_preserve'] = $_SESSION['guest_cart'];
+    }
     $_SESSION['redirect_after_login'] = 'checkout.php';
-    header('Location: ../index.php');
+    header('Location: ../../Register/login.php?redirect=' . urlencode('/websys/Pages/customer/checkout.php'));
     exit;
+} else {
+    // If user just logged in and had a guest cart, merge it with their account cart
+    if (isset($_SESSION['guest_cart_preserve']) && !empty($_SESSION['guest_cart_preserve'])) {
+        foreach ($_SESSION['guest_cart_preserve'] as $productId => $cartItem) {
+            if (isset($cartItem['product_id']) && isset($cartItem['quantity'])) {
+                // Check if product already in user's cart
+                $checkCart = $farmcart->conn->prepare("SELECT quantity FROM carts WHERE user_id = ? AND product_id = ?");
+                $checkCart->bind_param("ii", $userId, $productId);
+                $checkCart->execute();
+                $cartResult = $checkCart->get_result();
+                
+                if ($cartResult->num_rows > 0) {
+                    // Update quantity
+                    $updateCart = $farmcart->conn->prepare("UPDATE carts SET quantity = quantity + ? WHERE user_id = ? AND product_id = ?");
+                    $qty = (int)$cartItem['quantity'];
+                    $updateCart->bind_param("iii", $qty, $userId, $productId);
+                    $updateCart->execute();
+                    $updateCart->close();
+                } else {
+                    // Insert new cart item
+                    $insertCart = $farmcart->conn->prepare("INSERT INTO carts (user_id, product_id, quantity) VALUES (?, ?, ?)");
+                    $qty = (int)$cartItem['quantity'];
+                    $insertCart->bind_param("iii", $userId, $productId, $qty);
+                    $insertCart->execute();
+                    $insertCart->close();
+                }
+                $checkCart->close();
+            }
+        }
+        unset($_SESSION['guest_cart_preserve']);
+        unset($_SESSION['guest_cart']);
+    }
 }
 
 $items = [];
@@ -21,7 +57,11 @@ if ($userId) {
         SELECT c.cart_id, c.product_id, p.product_name, c.quantity, p.base_price, p.unit_type
         FROM carts c
         JOIN products p ON c.product_id = p.product_id
-        WHERE c.user_id = ?
+        WHERE c.user_id = ? 
+          AND p.approval_status = 'approved' 
+          AND p.is_listed = TRUE
+          AND (p.is_expired IS NULL OR p.is_expired = 0)
+          AND (p.expires_at IS NULL OR p.expires_at > NOW())
     ");
     $stmt->bind_param("i", $userId);
     $stmt->execute();
@@ -48,7 +88,11 @@ if ($userId) {
         if (isset($cartItem['product_id'])) {
             $sql = "SELECT product_id, product_name, base_price, unit_type 
                     FROM products 
-                    WHERE product_id = ? AND approval_status = 'approved' AND is_listed = TRUE";
+                    WHERE product_id = ? 
+                      AND approval_status = 'approved' 
+                      AND is_listed = TRUE
+                      AND (is_expired IS NULL OR is_expired = 0)
+                      AND (expires_at IS NULL OR expires_at > NOW())";
             $stmt = $farmcart->conn->prepare($sql);
             if ($stmt) {
                 $stmt->bind_param("i", $productId);

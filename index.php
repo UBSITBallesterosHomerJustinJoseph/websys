@@ -234,54 +234,84 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_store'])) {
         </div>
     </section>
 
-    <!-- Premium Livestock Section -->
+    <!-- Livestock Section -->
     <section id="livestock" class="livestock-section">
         <div class="container">
             <div class="section-header">
-                <h2>Premium Livestock</h2>
+                <h2>Livestock</h2>
                 <p>Ethically raised, grass-fed, and hormone-free meat from our trusted local farms</p>
             </div>
 
+            <?php
+            // Fetch livestock products from database
+            $livestock_products = [];
+            if (isset($farmcart) && $farmcart->conn) {
+                $livestock_products_query = "SELECT
+                        p.product_id,
+                        p.product_name,
+                        p.description,
+                        p.base_price,
+                        p.unit_type,
+                        p.quantity,
+                        c.category_name,
+                        c.category_type,
+                        pi.image_url,
+                        u.first_name as farmer_first,
+                        u.last_name as farmer_last,
+                        fp.farm_name
+                     FROM products p
+                     LEFT JOIN categories c ON p.category_id = c.category_id
+                     LEFT JOIN product_images pi ON p.product_id = pi.product_id AND pi.is_primary = TRUE
+                     LEFT JOIN users u ON p.created_by = u.user_id
+                     LEFT JOIN farmer_profiles fp ON p.created_by = fp.user_id
+                     WHERE p.approval_status = 'approved'
+                       AND p.is_listed = TRUE
+                       AND (p.is_expired IS NULL OR p.is_expired = 0)
+                       AND (p.expires_at IS NULL OR p.expires_at > NOW())
+                       AND c.category_type = 'livestock'
+                     ORDER BY p.created_at DESC
+                     LIMIT 4";
+                $livestock_result = $farmcart->conn->query($livestock_products_query);
+                if ($livestock_result && $livestock_result->num_rows > 0) {
+                    while ($row = $livestock_result->fetch_assoc()) {
+                        $livestock_products[] = $row;
+                    }
+                }
+            }
+            ?>
+
             <div class="livestock-grid">
-                <div class="livestock-card">
-                    <img src="https://readdy.ai/api/search-image?query=Premium%20goat%20meat%20cuts%20displayed%20on%20wooden%20cutting%20board%2C%20professional%20butcher%20shop%20style%2C%20clean%20white%20background%2C%20high%20quality%20commercial%20food%20photography%2C%20natural%20lighting%2C%20rustic%20presentation&width=300&height=250&seq=goat001&orientation=landscape" alt="Goat" class="product-image">
-                    <div class="product-content">
-                        <h3>Goat</h3>
-                        <p>Premium goat meat</p>
-                        <div class="product-price">From $18/lb</div>
-                        <button class="btn-add-to-cart" onclick="<?php echo isset($_SESSION['user_id']) ? "alert('Order placed')" : "window.location='Register/login.php'"; ?>">Order Now</button>
+                <?php if (!empty($livestock_products)): ?>
+                    <?php foreach ($livestock_products as $product): ?>
+                        <?php
+                        $image_url = !empty($product['image_url']) ? $product['image_url'] : '';
+                        if (!empty($image_url) && !preg_match('/^https?:\/\//', $image_url)) {
+                            if (strpos($image_url, 'uploads/') === 0) {
+                                $image_url = 'Pages/farmer/' . $image_url;
+                            }
+                        }
+                        if (empty($image_url)) {
+                            $image_url = 'https://via.placeholder.com/300x250?text=No+Image';
+                        }
+                        ?>
+                        <div class="livestock-card" onclick="window.location='Pages/customer/products.php?category=livestock'">
+                            <img src="<?= htmlspecialchars($image_url); ?>" alt="<?= htmlspecialchars($product['product_name']); ?>" class="product-image" onerror="this.src='https://via.placeholder.com/300x250?text=No+Image'">
+                            <div class="product-content">
+                                <h3><?= htmlspecialchars($product['product_name']); ?></h3>
+                                <p><?= htmlspecialchars(substr($product['description'] ?? 'Fresh from local farms', 0, 50)) . (strlen($product['description'] ?? '') > 50 ? '...' : ''); ?></p>
+                                <div class="product-price">₱<?= number_format($product['base_price'], 2); ?>/<?= htmlspecialchars($product['unit_type']); ?></div>
+                                <button class="btn-add-to-cart" onclick="event.stopPropagation(); window.location='Pages/customer/products.php?category=livestock'">View Products</button>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <div style="grid-column: 1/-1; text-align: center; padding: 3rem;">
+                        <i class="fas fa-cow fa-4x text-muted mb-3"></i>
+                        <h3>No Livestock Products Yet</h3>
+                        <p class="text-muted">Check back soon for fresh livestock products from our local farms.</p>
+                        <a href="Pages/customer/products.php?category=livestock" class="btn btn-primary mt-3">Browse All Products</a>
                     </div>
-                </div>
-
-                <div class="livestock-card">
-                    <img src="https://readdy.ai/api/search-image?query=Fresh%20pork%20cuts%20and%20chops%20arranged%20on%20wooden%20surface%2C%20professional%20butcher%20shop%20display%2C%20clean%20white%20background%2C%20high%20quality%20commercial%20food%20photography%2C%20natural%20lighting%2C%20premium%20meat%20presentation&width=300&height=250&seq=pork001&orientation=landscape" alt="Pork" class="product-image">
-                    <div class="product-content">
-                        <h3>Pork</h3>
-                        <p>Farm-raised pork</p>
-                        <div class="product-price">From $12/lb</div>
-                        <button class="btn-add-to-cart" onclick="<?php echo isset($_SESSION['user_id']) ? "alert('Order placed')" : "window.location='Register/login.php'"; ?>">Order Now</button>
-                    </div>
-                </div>
-
-                <div class="livestock-card">
-                    <img src="https://readdy.ai/api/search-image?query=Fresh%20whole%20chicken%20and%20chicken%20parts%20displayed%20on%20wooden%20cutting%20board%2C%20professional%20butcher%20shop%20style%2C%20clean%20white%20background%2C%20high%20quality%20commercial%20food%20photography%2C%20natural%20lighting&width=300&height=250&seq=chicken001&orientation=landscape" alt="Chicken" class="product-image">
-                    <div class="product-content">
-                        <h3>Chicken</h3>
-                        <p>Free-range chicken</p>
-                        <div class="product-price">From $8/lb</div>
-                        <button class="btn-add-to-cart" onclick="<?php echo isset($_SESSION['user_id']) ? "alert('Order placed')" : "window.location='Register/login.php'"; ?>">Order Now</button>
-                    </div>
-                </div>
-
-                <div class="livestock-card">
-                    <img src="https://readdy.ai/api/search-image?query=Premium%20beef%20steaks%20and%20cuts%20on%20wooden%20cutting%20board%2C%20professional%20butcher%20shop%20display%2C%20clean%20white%20background%2C%20high%20quality%20commercial%20food%20photography%2C%20natural%20lighting%2C%20marbled%20meat%20texture&width=300&height=250&seq=beef001&orientation=landscape" alt="Beef" class="product-image">
-                    <div class="product-content">
-                        <h3>Beef</h3>
-                        <p>Grass-fed beef</p>
-                        <div class="product-price">From $22/lb</div>
-                        <button class="btn-add-to-cart" onclick="<?php echo isset($_SESSION['user_id']) ? "alert('Order placed')" : "window.location='Register/login.php'"; ?>">Order Now</button>
-                    </div>
-                </div>
+                <?php endif; ?>
             </div>
         </div>
     </section>

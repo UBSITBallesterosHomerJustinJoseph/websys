@@ -339,12 +339,24 @@ $user    = $userObj->getById($userId); // Ensure this joins farmer_profiles tabl
             <?php endif; ?>
           </h5>
           <ul>
-            <li><i class="fas fa-map-marker-alt"></i><span><?php echo htmlspecialchars($user['farm_location']); ?></span></li>
-            <li><i class="fas fa-ruler-combined"></i><span><?php echo htmlspecialchars($user['farm_size']); ?> hectares</span></li>
-            <li><i class="fas fa-seedling"></i><span><?php echo htmlspecialchars($user['farming_method']); ?></span></li>
-            <li><i class="fas fa-calendar-alt"></i><span><?php echo htmlspecialchars($user['years_experience']); ?> years experience</span></li>
-            <li><i class="fas fa-certificate"></i><span><?php echo htmlspecialchars($user['certification_details']); ?></span></li>
-            <li><i class="fas fa-info-circle"></i><span><?php echo htmlspecialchars($user['bio']); ?></span></li>
+            <?php if (!empty($user['farm_location'])): ?>
+              <li><i class="fas fa-map-marker-alt"></i><span><?php echo htmlspecialchars($user['farm_location']); ?></span></li>
+            <?php endif; ?>
+            <?php if (!empty($user['farm_size'])): ?>
+              <li><i class="fas fa-ruler-combined"></i><span><?php echo htmlspecialchars($user['farm_size']); ?> hectares</span></li>
+            <?php endif; ?>
+            <?php if (!empty($user['farming_method'])): ?>
+              <li><i class="fas fa-seedling"></i><span><?php echo htmlspecialchars($user['farming_method']); ?></span></li>
+            <?php endif; ?>
+            <?php if (!empty($user['years_experience'])): ?>
+              <li><i class="fas fa-calendar-alt"></i><span><?php echo htmlspecialchars($user['years_experience']); ?> years experience</span></li>
+            <?php endif; ?>
+            <?php if (!empty($user['certification_details'])): ?>
+              <li><i class="fas fa-certificate"></i><span><?php echo htmlspecialchars($user['certification_details']); ?></span></li>
+            <?php endif; ?>
+            <?php if (!empty($user['bio'])): ?>
+              <li><i class="fas fa-info-circle"></i><span><?php echo htmlspecialchars($user['bio']); ?></span></li>
+            <?php endif; ?>
           </ul>
           <small class="text-muted d-block mt-3">Created: <?php echo htmlspecialchars($user['created_at']); ?> | Updated: <?php echo htmlspecialchars($user['updated_at']); ?></small>
           <div class="d-flex gap-2 mt-3 flex-wrap">

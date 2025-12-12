@@ -134,12 +134,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $itemStmt->close();
         }
         
-        // Clear cart after successful order
+        // Clear cart after successful order (both database and session)
         $clearCartSql = "DELETE FROM carts WHERE user_id = ?";
         $clearCartStmt = $farmcart->conn->prepare($clearCartSql);
         $clearCartStmt->bind_param("i", $userId);
         $clearCartStmt->execute();
         $clearCartStmt->close();
+        
+        // Also clear guest cart if exists
+        if (isset($_SESSION['guest_cart'])) {
+            unset($_SESSION['guest_cart']);
+        }
         
         // Commit transaction
         $farmcart->conn->commit();
