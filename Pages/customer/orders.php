@@ -1,0 +1,6 @@
+<?php
+// Redirect to checkorders.php for consistency
+header('Location: checkorders.php');
+exit;
+?>
+

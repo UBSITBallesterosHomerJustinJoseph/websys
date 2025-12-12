@@ -5,7 +5,8 @@ include '../../db_connect.php';
 header('Content-Type: application/json');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $userId = $_SESSION['user_id'];
+    // Check if user is logged in - allow guest users to add to cart
+    $userId = isset($_SESSION['user_id']) && !empty($_SESSION['user_id']) ? $_SESSION['user_id'] : null;
     $productId = $_POST['product_id'] ?? null;
     $quantity = isset($_POST['quantity']) ? (int)$_POST['quantity'] : 1;
 

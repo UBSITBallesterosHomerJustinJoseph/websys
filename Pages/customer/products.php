@@ -4,11 +4,43 @@ include '../../db_connect.php';
 // Check if user is logged in (but don't require it for browsing)
 $is_logged_in = isset($_SESSION['user_id']) && !empty($_SESSION['user_id']);
 
-// Get category from URL
-$category_name = $_GET['category'] ?? '';
+// Get category from URL - can be category_id or category_type
+$category_param = $_GET['category'] ?? '';
 $category_type = $_GET['type'] ?? '';
+$category_id = null;
 
-// Map category names to types
+// Fetch all categories for dropdown
+$all_categories = [];
+$categories_query = "SELECT category_id, category_name, category_type FROM categories WHERE is_active = 1 ORDER BY category_name";
+$categories_result = $farmcart->conn->query($categories_query);
+if ($categories_result && $categories_result->num_rows > 0) {
+    while ($row = $categories_result->fetch_assoc()) {
+        $all_categories[] = $row;
+    }
+}
+
+// Determine if category_param is an ID or type
+if (!empty($category_param)) {
+    if (is_numeric($category_param)) {
+        // It's a category_id
+        $category_id = (int)$category_param;
+        // Get the category_type from the category_id
+        $cat_query = $farmcart->conn->prepare("SELECT category_type FROM categories WHERE category_id = ?");
+        $cat_query->bind_param("i", $category_id);
+        $cat_query->execute();
+        $cat_result = $cat_query->get_result();
+        if ($cat_result->num_rows > 0) {
+            $cat_data = $cat_result->fetch_assoc();
+            $category_type = $cat_data['category_type'];
+        }
+        $cat_query->close();
+    } else {
+        // It's a category_type
+        $category_type = $category_param;
+    }
+}
+
+// Map category names to types (for backward compatibility)
 $category_mapping = [
     'vegetables' => 'vegetables',
     'fruits' => 'fruits',
@@ -19,6 +51,7 @@ $category_mapping = [
     'fish' => 'livestock'
 ];
 
+$category_name = $category_type;
 $category_type = $category_mapping[$category_name] ?? $category_type;
 
 // Get category display name and description
@@ -75,11 +108,21 @@ $products_query = "SELECT
 
 // Filter by category if not 'all'
 $stmt = null;
-if ($category_name !== 'all' && !empty($category_type)) {
+if (!empty($category_type) && $category_type !== 'all') {
     $products_query .= " AND c.category_type = ?";
     $stmt = $farmcart->conn->prepare($products_query);
     if ($stmt) {
         $stmt->bind_param("s", $category_type);
+        $stmt->execute();
+        $products_result = $stmt->get_result();
+    } else {
+        $products_result = false;
+    }
+} elseif (!empty($category_id)) {
+    $products_query .= " AND p.category_id = ?";
+    $stmt = $farmcart->conn->prepare($products_query);
+    if ($stmt) {
+        $stmt->bind_param("i", $category_id);
         $stmt->execute();
         $products_result = $stmt->get_result();
     } else {
@@ -171,9 +214,9 @@ if ($products_result) {
             <?php if (!$is_logged_in): ?>
                 <div class="alert alert-info alert-dismissible fade show" role="alert" style="margin-bottom: 2rem; border-left: 4px solid #0F2E15;">
                     <i class="fas fa-info-circle me-2"></i>
-                    <strong>Browse freely!</strong> You can view all products, but you'll need to 
-                    <a href="/websys/Register/login.php?redirect=<?php echo urlencode($_SERVER['REQUEST_URI']); ?>" class="alert-link fw-bold">log in</a> 
-                    to add items to your cart and make purchases.
+                    <strong>Browse and shop freely!</strong> You can add items to your cart as a guest. 
+                    <a href="/websys/Register/login.php?redirect=<?php echo urlencode($_SERVER['REQUEST_URI']); ?>" class="alert-link fw-bold">Log in</a> 
+                    to save your cart and complete your purchase.
                     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                 </div>
             <?php endif; ?>
@@ -186,12 +229,13 @@ if ($products_result) {
                     </div>
                     <div class="col-md-6 text-end">
                         <div class="sorting-options">
-                            <select class="form-select" style="max-width: 200px;">
-                                <option>Sort by: Popular</option>
-                                <option>Price: Low to High</option>
-                                <option>Price: High to Low</option>
-                                <option>Rating: Highest First</option>
-                                <option>Newest First</option>
+                            <select class="form-select" id="categoryFilter" style="max-width: 250px;" onchange="filterByCategory(this.value)">
+                                <option value="">All Categories</option>
+                                <?php foreach ($all_categories as $cat): ?>
+                                    <option value="<?= htmlspecialchars($cat['category_type']); ?>" <?= ($category_type === $cat['category_type']) ? 'selected' : ''; ?>>
+                                        <?= htmlspecialchars($cat['category_name']); ?>
+                                    </option>
+                                <?php endforeach; ?>
                             </select>
                         </div>
                     </div>
@@ -533,6 +577,15 @@ if ($products_result) {
             setTimeout(() => {
                 toast.remove();
             }, 3000);
+        }
+
+        // Category filter function
+        function filterByCategory(categoryType) {
+            if (categoryType) {
+                window.location.href = 'products.php?category=' + encodeURIComponent(categoryType);
+            } else {
+                window.location.href = 'products.php';
+            }
         }
 
         // Product Details Modal
