@@ -20,14 +20,53 @@ if (isset($_SESSION['user_id'])) {
     $user_role = $_SESSION['user_role'];
 }
 
-// Fetch categories for display
+// Fetch categories for display (works for both guests and logged-in users)
 $categories = [];
-$categories_query = "SELECT * FROM categories WHERE is_active = 1 ORDER BY category_name LIMIT 4";
-$categories_result = $farmcart->conn->query($categories_query);
-if ($categories_result && $categories_result->num_rows > 0) {
-    while ($row = $categories_result->fetch_assoc()) {
-        $categories[] = $row;
-    }
+try {
+    $pdo = $farmcart->getPDO();
+    $categories_stmt = $pdo->prepare("SELECT * FROM categories WHERE is_active = 1 ORDER BY category_name LIMIT 4");
+    $categories_stmt->execute();
+    $categories = $categories_stmt->fetchAll();
+} catch (PDOException $e) {
+    error_log("Error fetching categories: " . $e->getMessage());
+    $categories = [];
+}
+
+// Fetch newly approved products for "New Products" section (works for both guests and logged-in users)
+$new_products = [];
+try {
+    $pdo = $farmcart->getPDO();
+    $new_products_stmt = $pdo->prepare("SELECT
+                        p.product_id,
+                        p.product_name,
+                        p.description,
+                        p.category_id,
+                        p.unit_type,
+                        p.base_price,
+                        p.quantity,
+                        p.approved_at,
+                        c.category_name,
+                        c.category_type,
+                        pi.image_url,
+                        u.first_name as farmer_first,
+                        u.last_name as farmer_last,
+                        fp.farm_name
+                     FROM products p
+                     LEFT JOIN categories c ON p.category_id = c.category_id
+                     LEFT JOIN product_images pi ON p.product_id = pi.product_id AND pi.is_primary = TRUE
+                     LEFT JOIN users u ON p.created_by = u.user_id
+                     LEFT JOIN farmer_profiles fp ON p.created_by = fp.user_id
+                     WHERE p.approval_status = 'approved'
+                       AND p.is_listed = TRUE
+                       AND (p.is_expired IS NULL OR p.is_expired = 0)
+                       AND (p.expires_at IS NULL OR p.expires_at > NOW())
+                     ORDER BY COALESCE(p.approved_at, p.created_at) DESC
+                     LIMIT 6");
+    $new_products_stmt->execute();
+    $new_products = $new_products_stmt->fetchAll();
+} catch (PDOException $e) {
+    error_log("Error fetching new products: " . $e->getMessage());
+    $new_products = [];
 }
 
 // Handle store creation (only if logged in)
@@ -139,8 +178,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_store'])) {
             <div class="categories-grid">
                 <?php if (!empty($categories)): ?>
                     <?php foreach (array_slice($categories, 0, 4) as $category): ?>
+                        <?php
+                        // Fix category image path - categories are stored in Assets/images/categories/
+                        $cat_image_url = !empty($category['image_url']) ? $category['image_url'] : '';
+                        if (!empty($cat_image_url) && !preg_match('/^https?:\/\//', $cat_image_url)) {
+                            // Path is already relative to root (e.g., Assets/images/categories/file.jpg)
+                            // No need to modify if it starts with Assets/
+                            if (strpos($cat_image_url, 'Assets/') !== 0 && strpos($cat_image_url, 'uploads/') !== 0) {
+                                // If it doesn't start with Assets/ or uploads/, it might be a relative path
+                                $cat_image_url = $cat_image_url;
+                            }
+                        }
+                        if (empty($cat_image_url)) {
+                            $cat_image_url = 'https://readdy.ai/api/search-image?query=Fresh%20produce%20category&width=400&height=300';
+                        }
+                        ?>
                     <div class="category-card" onclick="window.location='Pages/customer/products.php?category=<?php echo urlencode($category['category_id']); ?>'">
-                        <img src="<?php echo htmlspecialchars($category['image_url'] ?? 'https://readdy.ai/api/search-image?query=Fresh%20produce%20category&width=400&height=300'); ?>" alt="<?php echo htmlspecialchars($category['category_name']); ?>" class="category-image">
+                        <img src="<?php echo htmlspecialchars($cat_image_url); ?>" 
+                             alt="<?php echo htmlspecialchars($category['category_name']); ?>" 
+                             class="category-image"
+                             onerror="this.src='https://readdy.ai/api/search-image?query=Fresh%20produce%20category&width=400&height=300'">
                         <div class="category-content">
                             <h3><?php echo htmlspecialchars($category['category_name']); ?></h3>
                             <p><?php echo htmlspecialchars($category['description'] ?? 'Fresh from local farms'); ?></p>
@@ -165,36 +222,60 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_store'])) {
             </div>
 
             <div class="products-grid">
-                <div class="product-card">
-                    <img src="https://readdy.ai/api/search-image?query=Premium%20organic%20heirloom%20tomatoes%20in%20various%20colors%20red%2C%20yellow%2C%20purple%20arranged%20in%20wooden%20basket%2C%20natural%20lighting%2C%20clean%20white%20background%2C%20professional%20food%20photography%20style&width=400&height=350&seq=tomatoes001&orientation=landscape" alt="Heirloom Tomatoes" class="product-image">
-                    <div class="product-content">
-                        <h3>Heirloom Tomatoes</h3>
-                        <p>Colorful, flavorful varieties from heritage seeds</p>
-                        <div class="product-price">$6.99/lb</div>
-                        <button class="btn-add-to-cart" onclick="<?php echo isset($_SESSION['user_id']) ? "alert('Added to cart')" : "window.location='Register/login.php'"; ?>">Add to Cart</button>
+                <?php if (!empty($new_products)): ?>
+                    <?php foreach ($new_products as $product): ?>
+                        <?php
+                        // Fix image path
+                        $image_url = !empty($product['image_url']) ? $product['image_url'] : '';
+                        if (!empty($image_url) && !preg_match('/^https?:\/\//', $image_url)) {
+                            if (strpos($image_url, 'uploads/') === 0) {
+                                $image_url = 'Pages/farmer/' . $image_url;
+                            }
+                        }
+                        if (empty($image_url)) {
+                            $image_url = 'https://readdy.ai/api/search-image?query=Fresh%20farm%20product&width=400&height=350';
+                        }
+                        
+                        $farmer_name = htmlspecialchars(($product['farmer_first'] ?? '') . ' ' . ($product['farmer_last'] ?? ''));
+                        $farm_name = !empty($product['farm_name']) ? htmlspecialchars($product['farm_name']) : '';
+                        $product_link = isset($_SESSION['user_id']) ? 'Pages/customer/products.php?product=' . $product['product_id'] : 'Register/login.php';
+                        ?>
+                        <div class="product-card" onclick="window.location='<?php echo $product_link; ?>'" style="cursor: pointer;">
+                            <img src="<?php echo htmlspecialchars($image_url); ?>" 
+                                 alt="<?php echo htmlspecialchars($product['product_name']); ?>" 
+                                 class="product-image"
+                                 onerror="this.src='https://readdy.ai/api/search-image?query=Fresh%20farm%20product&width=400&height=350'">
+                            <div class="product-content">
+                                <h3><?php echo htmlspecialchars($product['product_name']); ?></h3>
+                                <p><?php echo htmlspecialchars(substr($product['description'] ?? 'Fresh from local farms', 0, 80)); ?><?php echo strlen($product['description'] ?? '') > 80 ? '...' : ''; ?></p>
+                                <?php if (!empty($farm_name)): ?>
+                                    <p style="font-size: 0.85rem; color: #666; margin: 0.25rem 0;">
+                                        <i class="ri-store-line"></i> <?php echo $farm_name; ?>
+                                    </p>
+                                <?php endif; ?>
+                                <div class="product-price">₱<?php echo number_format($product['base_price'], 2); ?>/<?php echo htmlspecialchars($product['unit_type']); ?></div>
+                                <?php if (isset($_SESSION['user_id'])): ?>
+                                    <button class="btn-add-to-cart" onclick="event.stopPropagation(); window.location='Pages/customer/products.php?product=<?php echo $product['product_id']; ?>'">View Product</button>
+                                <?php else: ?>
+                                    <button class="btn-add-to-cart" onclick="event.stopPropagation(); window.location='Register/login.php'">View Product</button>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <div style="grid-column: 1/-1; text-align: center; padding: 2rem;">
+                        <p style="color: #666;">No new products available at the moment. Check back soon!</p>
                     </div>
-                </div>
-
-                <div class="product-card">
-                    <img src="https://readdy.ai/api/search-image?query=Fresh%20wild%20caught%20salmon%20fillets%20on%20ice%20display%2C%20professional%20seafood%20market%20presentation%2C%20clean%20white%20background%2C%20natural%20lighting%2C%20premium%20fish%20quality&width=400&height=350&seq=salmon001&orientation=landscape" alt="Wild Salmon" class="product-image">
-                    <div class="product-content">
-                        <h3>Wild Salmon</h3>
-                        <p>Fresh wild-caught Pacific salmon</p>
-                        <div class="product-price">$24.99/lb</div>
-                        <button class="btn-add-to-cart" onclick="<?php echo isset($_SESSION['user_id']) ? "alert('Added to cart')" : "window.location='Register/login.php'"; ?>">Add to Cart</button>
-                    </div>
-                </div>
-
-                <div class="product-card">
-                    <img src="https://readdy.ai/api/search-image?query=Artisanal%20goat%20cheese%20wheels%20and%20wedges%20arranged%20on%20wooden%20board%2C%20professional%20dairy%20photography%2C%20clean%20white%20background%2C%20natural%20lighting%2C%20premium%20cheese%20presentation&width=400&height=350&seq=cheese001&orientation=landscape" alt="Artisan Cheese" class="product-image">
-                    <div class="product-content">
-                        <h3>Artisan Goat Cheese</h3>
-                        <p>Locally crafted from our farm-fresh goat milk</p>
-                        <div class="product-price">$12.99</div>
-                        <button class="btn-add-to-cart" onclick="<?php echo isset($_SESSION['user_id']) ? "alert('Added to cart')" : "window.location='Register/login.php'"; ?>">Add to Cart</button>
-                    </div>
-                </div>
+                <?php endif; ?>
             </div>
+            
+            <?php if (!empty($new_products)): ?>
+                <div style="text-align: center; margin-top: 2rem;">
+                    <a href="Pages/customer/products.php" class="btn btn-primary" style="display: inline-block;">
+                        View All Products
+                    </a>
+                </div>
+            <?php endif; ?>
         </div>
     </section>
 

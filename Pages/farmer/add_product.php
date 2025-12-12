@@ -81,7 +81,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_product'])) {
         $stmt = $farmcart->conn->prepare($sql);
 
         if ($stmt) {
-            $stmt->bind_param("ssisdiisi", $product_name, $description, $category_id, $unit_type, $base_price, $initial_quantity, $farmer_id, $expiration_duration_seconds);
+            // Type string: s=string, i=integer, d=double
+            // 8 parameters in order: product_name(s), description(s), category_id(i), unit_type(s), base_price(d), initial_quantity(i), farmer_id(i), expiration_duration_seconds(i)
+            // Type string must be exactly 8 characters matching 8 parameters
+            // Build type string explicitly: s(product_name) + s(description) + i(category_id) + s(unit_type) + d(base_price) + i(initial_quantity) + i(farmer_id) + i(expiration_duration_seconds)
+            $type_string = "s" . "s" . "i" . "s" . "d" . "i" . "i" . "i"; // Ensures exactly 8 characters
+            $stmt->bind_param($type_string, $product_name, $description, $category_id, $unit_type, $base_price, $initial_quantity, $farmer_id, $expiration_duration_seconds);
 
             if ($stmt->execute()) {
                 $product_id = $stmt->insert_id;
