@@ -20,7 +20,7 @@ if (isset($_SESSION['user_id'])) {
     $user_role = $_SESSION['user_role'];
 }
 
-// Fetch categories for display
+// Fetch categories for display (works for both guests and logged-in users)
 $categories = [];
 $categories_query = "SELECT * FROM categories WHERE is_active = 1 ORDER BY category_name LIMIT 4";
 $categories_result = $farmcart->conn->query($categories_query);

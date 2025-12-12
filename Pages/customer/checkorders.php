@@ -179,9 +179,20 @@ if ($userId) {
                       <tbody>
                         <?php foreach ($order['items'] as $item): ?>
                           <tr>
-                            <td><?= htmlspecialchars($item['product_name']); ?> 
+                            <td>
+                              <?= htmlspecialchars($item['product_name']); ?> 
                               <?php if (!empty($item['lot_number'])): ?>
                                 <small class="text-muted">(Lot: <?= htmlspecialchars($item['lot_number']); ?>)</small>
+                              <?php endif; ?>
+                              <?php if (in_array($order['status'], ['delivered', 'ready_to_pickup']) && !empty($item['product_id'])): ?>
+                                <br>
+                                <?php if ($item['has_review']): ?>
+                                  <small class="text-success"><i class="fas fa-check-circle"></i> Reviewed</small>
+                                <?php else: ?>
+                                  <button class="btn btn-sm btn-outline-primary mt-1" onclick="openReviewModal(<?= $item['product_id']; ?>, <?= $order['order_id']; ?>, '<?= htmlspecialchars($item['product_name']); ?>')">
+                                    <i class="fas fa-star"></i> Write Review
+                                  </button>
+                                <?php endif; ?>
                               <?php endif; ?>
                             </td>
                             <td><?= number_format($item['quantity'], 2); ?> <?= htmlspecialchars($item['unit_type'] ?? ''); ?></td>
@@ -229,7 +240,125 @@ if ($userId) {
 
   <?php require_once '../../Includes/footer.php'; ?>
 
+  <!-- Review Modal -->
+  <div class="modal fade" id="reviewModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Write a Review</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p><strong>Product:</strong> <span id="reviewProductName"></span></p>
+          <form id="reviewForm">
+            <input type="hidden" id="reviewProductId" name="product_id">
+            <input type="hidden" id="reviewOrderId" name="order_id">
+            
+            <div class="mb-3">
+              <label class="form-label">Rating <span class="text-danger">*</span></label>
+              <div class="rating-input">
+                <input type="radio" name="rating" value="5" id="rating5" required>
+                <label for="rating5" class="star-label">★</label>
+                <input type="radio" name="rating" value="4" id="rating4" required>
+                <label for="rating4" class="star-label">★</label>
+                <input type="radio" name="rating" value="3" id="rating3" required>
+                <label for="rating3" class="star-label">★</label>
+                <input type="radio" name="rating" value="2" id="rating2" required>
+                <label for="rating2" class="star-label">★</label>
+                <input type="radio" name="rating" value="1" id="rating1" required>
+                <label for="rating1" class="star-label">★</label>
+              </div>
+            </div>
+            
+            <div class="mb-3">
+              <label for="reviewText" class="form-label">Review (Optional)</label>
+              <textarea class="form-control" id="reviewText" name="review_text" rows="4" placeholder="Share your experience with this product..."></textarea>
+            </div>
+            
+            <div id="reviewMessage" class="alert" style="display: none;"></div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary" onclick="submitReview()">Submit Review</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    .rating-input {
+      display: flex;
+      flex-direction: row-reverse;
+      justify-content: flex-end;
+      gap: 5px;
+    }
+    .rating-input input[type="radio"] {
+      display: none;
+    }
+    .rating-input label.star-label {
+      font-size: 2rem;
+      color: #ddd;
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+    .rating-input input[type="radio"]:checked ~ label.star-label,
+    .rating-input label.star-label:hover,
+    .rating-input label.star-label:hover ~ label.star-label {
+      color: #ffc107;
+    }
+  </style>
+
   <!-- Bootstrap JS Bundle (required for dropdown functionality) -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    function openReviewModal(productId, orderId, productName) {
+      document.getElementById('reviewProductId').value = productId;
+      document.getElementById('reviewOrderId').value = orderId;
+      document.getElementById('reviewProductName').textContent = productName;
+      document.getElementById('reviewForm').reset();
+      document.getElementById('reviewMessage').style.display = 'none';
+      new bootstrap.Modal(document.getElementById('reviewModal')).show();
+    }
+
+    function submitReview() {
+      const form = document.getElementById('reviewForm');
+      const formData = new FormData(form);
+      const messageDiv = document.getElementById('reviewMessage');
+      
+      // Validate rating
+      const rating = formData.get('rating');
+      if (!rating) {
+        messageDiv.className = 'alert alert-danger';
+        messageDiv.textContent = 'Please select a rating.';
+        messageDiv.style.display = 'block';
+        return;
+      }
+
+      fetch('submit_review.php', {
+        method: 'POST',
+        body: formData
+      })
+      .then(response => response.json())
+      .then(data => {
+        messageDiv.style.display = 'block';
+        if (data.success) {
+          messageDiv.className = 'alert alert-success';
+          messageDiv.textContent = data.message;
+          setTimeout(() => {
+            location.reload();
+          }, 1500);
+        } else {
+          messageDiv.className = 'alert alert-danger';
+          messageDiv.textContent = data.message;
+        }
+      })
+      .catch(error => {
+        messageDiv.className = 'alert alert-danger';
+        messageDiv.textContent = 'An error occurred. Please try again.';
+        messageDiv.style.display = 'block';
+      });
+    }
+  </script>
 </body>
 </html>
