@@ -5,8 +5,7 @@ include '../../db_connect.php';
 header('Content-Type: application/json');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Check if user is logged in - allow guest users to add to cart
-    $userId = isset($_SESSION['user_id']) && !empty($_SESSION['user_id']) ? $_SESSION['user_id'] : null;
+    $userId = $_SESSION['user_id'];
     $productId = $_POST['product_id'] ?? null;
     $quantity = isset($_POST['quantity']) ? (int)$_POST['quantity'] : 1;
 
@@ -100,13 +99,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $stmt->close();
         } else {
-            // Redirect guests to register when trying to add to cart
-            echo json_encode([
-                'success' => false, 
-                'message' => 'Please register or login to add items to cart.',
-                'redirect' => '/websys/Register/index.php'
-            ]);
-            exit;
+            // Handle case where user is not logged in
+            if (!isset($_SESSION['guest_cart'])) {
+                $_SESSION['guest_cart'] = [];
+            }
+            // Check available quantity for guest
+            if ($quantity > $totalAvailable) {
+                echo json_encode(['success' => false, 'message' => "Cannot add. Only {$totalAvailable} available."]);
+                exit;
+            }
+            
+            if (!isset($_SESSION['guest_cart'][$productId])) {
+                $_SESSION['guest_cart'][$productId] = [
+                    'product_id' => $productId,
+                    'quantity' => 0,
+                    'base_price' => $product['base_price']
+                ];
+            }
+            
+            $newGuestQty = $_SESSION['guest_cart'][$productId]['quantity'] + $quantity;
+            if ($newGuestQty > $totalAvailable) {
+                echo json_encode(['success' => false, 'message' => "Cannot add more. Only {$totalAvailable} available. You already have {$_SESSION['guest_cart'][$productId]['quantity']} in cart."]);
+                exit;
+            }
+            
+            $_SESSION['guest_cart'][$productId]['quantity'] += $quantity;
+            echo json_encode(['success' => true, 'message' => 'Product added to your cart (Guest).']);
         }
     } else {
         echo json_encode(['success' => false, 'message' => 'Invalid product or quantity.']);

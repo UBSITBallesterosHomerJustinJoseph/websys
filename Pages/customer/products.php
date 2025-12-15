@@ -4,44 +4,11 @@ include '../../db_connect.php';
 // Check if user is logged in (but don't require it for browsing)
 $is_logged_in = isset($_SESSION['user_id']) && !empty($_SESSION['user_id']);
 
-// Get category from URL - can be category_id or category_type
-$category_param = $_GET['category'] ?? '';
+// Get category from URL
+$category_name = $_GET['category'] ?? '';
 $category_type = $_GET['type'] ?? '';
-$category_id = null;
-$search_term = $_GET['search'] ?? '';
 
-// Fetch all categories for dropdown
-$all_categories = [];
-$categories_query = "SELECT category_id, category_name, category_type FROM categories WHERE is_active = 1 ORDER BY category_name";
-$categories_result = $farmcart->conn->query($categories_query);
-if ($categories_result && $categories_result->num_rows > 0) {
-    while ($row = $categories_result->fetch_assoc()) {
-        $all_categories[] = $row;
-    }
-}
-
-// Determine if category_param is an ID or type
-if (!empty($category_param)) {
-    if (is_numeric($category_param)) {
-        // It's a category_id
-        $category_id = (int)$category_param;
-        // Get the category_type from the category_id
-        $cat_query = $farmcart->conn->prepare("SELECT category_type FROM categories WHERE category_id = ?");
-        $cat_query->bind_param("i", $category_id);
-        $cat_query->execute();
-        $cat_result = $cat_query->get_result();
-        if ($cat_result->num_rows > 0) {
-            $cat_data = $cat_result->fetch_assoc();
-            $category_type = $cat_data['category_type'];
-        }
-        $cat_query->close();
-    } else {
-        // It's a category_type
-        $category_type = $category_param;
-    }
-}
-
-// Map category names to types (for backward compatibility)
+// Map category names to types
 $category_mapping = [
     'vegetables' => 'vegetables',
     'fruits' => 'fruits',
@@ -52,7 +19,6 @@ $category_mapping = [
     'fish' => 'livestock'
 ];
 
-$category_name = $category_type;
 $category_type = $category_mapping[$category_name] ?? $category_type;
 
 // Get category display name and description
@@ -105,65 +71,15 @@ $products_query = "SELECT
                  WHERE p.approval_status = 'approved'
                    AND p.is_listed = TRUE
                    AND (p.is_expired IS NULL OR p.is_expired = 0)
-                   AND (p.expires_at IS NULL OR p.expires_at > NOW())
-                 ORDER BY p.approved_at DESC, p.created_at DESC";
+                   AND (p.expires_at IS NULL OR p.expires_at > NOW())";
 
 // Filter by category if not 'all'
 $stmt = null;
-$has_where = true;
-
-// Add search filter if search term exists
-if (!empty($search_term)) {
-    $products_query .= " AND (p.product_name LIKE ? OR p.description LIKE ? OR c.category_name LIKE ?)";
-    $search_pattern = "%{$search_term}%";
-}
-
-if (!empty($category_type) && $category_type !== 'all') {
+if ($category_name !== 'all' && !empty($category_type)) {
     $products_query .= " AND c.category_type = ?";
-    if (!empty($search_term)) {
-        $stmt = $farmcart->conn->prepare($products_query);
-        if ($stmt) {
-            $stmt->bind_param("ssss", $search_pattern, $search_pattern, $search_pattern, $category_type);
-            $stmt->execute();
-            $products_result = $stmt->get_result();
-        } else {
-            $products_result = false;
-        }
-    } else {
-        $stmt = $farmcart->conn->prepare($products_query);
-        if ($stmt) {
-            $stmt->bind_param("s", $category_type);
-            $stmt->execute();
-            $products_result = $stmt->get_result();
-        } else {
-            $products_result = false;
-        }
-    }
-} elseif (!empty($category_id)) {
-    $products_query .= " AND p.category_id = ?";
-    if (!empty($search_term)) {
-        $stmt = $farmcart->conn->prepare($products_query);
-        if ($stmt) {
-            $stmt->bind_param("sssi", $search_pattern, $search_pattern, $search_pattern, $category_id);
-            $stmt->execute();
-            $products_result = $stmt->get_result();
-        } else {
-            $products_result = false;
-        }
-    } else {
-        $stmt = $farmcart->conn->prepare($products_query);
-        if ($stmt) {
-            $stmt->bind_param("i", $category_id);
-            $stmt->execute();
-            $products_result = $stmt->get_result();
-        } else {
-            $products_result = false;
-        }
-    }
-} elseif (!empty($search_term)) {
     $stmt = $farmcart->conn->prepare($products_query);
     if ($stmt) {
-        $stmt->bind_param("sss", $search_pattern, $search_pattern, $search_pattern);
+        $stmt->bind_param("s", $category_type);
         $stmt->execute();
         $products_result = $stmt->get_result();
     } else {
@@ -255,9 +171,9 @@ if ($products_result) {
             <?php if (!$is_logged_in): ?>
                 <div class="alert alert-info alert-dismissible fade show" role="alert" style="margin-bottom: 2rem; border-left: 4px solid #0F2E15;">
                     <i class="fas fa-info-circle me-2"></i>
-                    <strong>Browse and shop freely!</strong> You can add items to your cart as a guest. 
-                    <a href="/websys/Register/login.php?redirect=<?php echo urlencode($_SERVER['REQUEST_URI']); ?>" class="alert-link fw-bold">Log in</a> 
-                    to save your cart and complete your purchase.
+                    <strong>Browse freely!</strong> You can view all products, but you'll need to 
+                    <a href="/websys/Register/login.php?redirect=<?php echo urlencode($_SERVER['REQUEST_URI']); ?>" class="alert-link fw-bold">log in</a> 
+                    to add items to your cart and make purchases.
                     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                 </div>
             <?php endif; ?>
@@ -266,21 +182,16 @@ if ($products_result) {
                 <div class="row align-items-center">
                     <div class="col-md-6">
                         <h2 class="section-title">Available Products</h2>
-                        <?php if (!empty($search_term)): ?>
-                            <p class="text-muted">Search results for "<strong><?php echo htmlspecialchars($search_term); ?></strong>" - <?php echo count($products); ?> product<?php echo count($products) != 1 ? 's' : ''; ?> found</p>
-                        <?php else: ?>
-                            <p class="text-muted">Showing <?php echo count($products); ?> product<?php echo count($products) != 1 ? 's' : ''; ?></p>
-                        <?php endif; ?>
+                        <p class="text-muted">Showing <?php echo count($products); ?> product<?php echo count($products) != 1 ? 's' : ''; ?></p>
                     </div>
                     <div class="col-md-6 text-end">
                         <div class="sorting-options">
-                            <select class="form-select" id="categoryFilter" style="max-width: 250px;" onchange="filterByCategory(this.value)">
-                                <option value="">All Categories</option>
-                                <?php foreach ($all_categories as $cat): ?>
-                                    <option value="<?= htmlspecialchars($cat['category_type']); ?>" <?= ($category_type === $cat['category_type']) ? 'selected' : ''; ?>>
-                                        <?= htmlspecialchars($cat['category_name']); ?>
-                                    </option>
-                                <?php endforeach; ?>
+                            <select class="form-select" style="max-width: 200px;">
+                                <option>Sort by: Popular</option>
+                                <option>Price: Low to High</option>
+                                <option>Price: High to Low</option>
+                                <option>Rating: Highest First</option>
+                                <option>Newest First</option>
                             </select>
                         </div>
                     </div>
@@ -304,11 +215,6 @@ if ($products_result) {
                         }
                         
                         $expires_at = !empty($product['expires_at']) ? date('M d, Y h:i A', strtotime($product['expires_at'])) : 'No expiry set';
-                        
-                        // Get product rating
-                        $rating_data = $farmcart->getProductRating($product['product_id']);
-                        $avg_rating = $rating_data['avg_rating'];
-                        $review_count = $rating_data['review_count'];
                         ?>
                         <div class="col-md-4 col-lg-3">
                             <div class="card product-card">
@@ -326,24 +232,6 @@ if ($products_result) {
 
                                 <div class="card-body">
                                     <h5 class="card-title"><?= htmlspecialchars($product['product_name']); ?></h5>
-                                    
-                                    <?php if ($review_count > 0): ?>
-                                        <div class="mb-2">
-                                            <span class="text-warning">
-                                                <?php for ($i = 1; $i <= 5; $i++): ?>
-                                                    <i class="fas fa-star<?= $i <= round($avg_rating) ? '' : '-o' ?>"></i>
-                                                <?php endfor; ?>
-                                            </span>
-                                            <small class="text-muted ms-1"><?= number_format($avg_rating, 1); ?> (<?= $review_count; ?> review<?= $review_count != 1 ? 's' : ''; ?>)</small>
-                                        </div>
-                                    <?php else: ?>
-                                        <div class="mb-2">
-                                            <span class="text-muted">
-                                                <i class="far fa-star"></i>
-                                                <small>No reviews yet</small>
-                                            </span>
-                                        </div>
-                                    <?php endif; ?>
 
                                     <p class="text-muted mb-1">
                                         <i class="fas fa-user me-1"></i>
@@ -390,9 +278,7 @@ if ($products_result) {
                                                 class="btn btn-sm btn-outline-secondary" 
                                                 data-bs-toggle="modal" 
                                                 data-bs-target="#productDetailsModal" 
-                                                data-product-id="<?= $product['product_id']; ?>"
                                                 data-product='<?= json_encode([
-                                                    'id' => $product['product_id'],
                                                     'name' => $product['product_name'],
                                                     'category' => $product['category_name'],
                                                     'category_type' => $product['category_type'],
@@ -422,16 +308,14 @@ if ($products_result) {
                         </div>
                     <?php endforeach; ?>
                 <?php else: ?>
-                    <div class="col-12">
-                        <div class="text-center py-5">
-                            <i class="fas fa-box-open fa-4x text-muted mb-3"></i>
-                            <h3>No Products Yet</h3>
-                            <p class="text-muted">Check back soon for products in this category.</p>
-                            <a href="index.php" class="btn btn-primary mt-3">
-                                <i class="fas fa-arrow-left me-2"></i>
-                                Back to Home
-                            </a>
-                        </div>
+                    <div class="no-products">
+                        <div class="no-products-icon">📦</div>
+                        <h3>No Products Available</h3>
+                        <p>We're working on adding more products to this category.</p>
+                        <a href="index.php" class="btn btn-primary">
+                            <i class="fas fa-arrow-left me-2"></i>
+                            Back to Home
+                        </a>
                     </div>
                 <?php endif; ?>
             </div>
@@ -568,9 +452,6 @@ if ($products_result) {
 
         // Add to Cart Function
         function addToCart(productId, availableQuantity, evt) {
-            evt.preventDefault();
-            evt.stopPropagation();
-            
             // Get the button that was clicked
             const btn = evt ? evt.target.closest('button') : (window.event ? window.event.target.closest('button') : null);
             if (!btn) {
@@ -601,9 +482,7 @@ if ($products_result) {
             formData.append('quantity', 1);
             formData.append('available_quantity', availableQuantity);
             
-            // Use absolute path to avoid routing issues
-            const basePath = window.location.pathname.split('/Pages/customer/')[0] || '/websys';
-            fetch(basePath + '/Pages/customer/add_to_cart.php', {
+            fetch('add_to_cart.php', {
                 method: 'POST',
                 body: formData
             })
@@ -625,9 +504,6 @@ if ($products_result) {
                         btn.classList.add('btn-success');
                         btn.disabled = false;
                     }, 2000);
-                } else if (data.redirect) {
-                    // Redirect to register page if not logged in
-                    window.location.href = data.redirect;
                 } else {
                     alert(data.message || 'Failed to add product to cart.');
                     btn.innerHTML = originalText;
@@ -659,22 +535,12 @@ if ($products_result) {
             }, 3000);
         }
 
-        // Category filter function
-        function filterByCategory(categoryType) {
-            if (categoryType) {
-                window.location.href = 'products.php?category=' + encodeURIComponent(categoryType);
-            } else {
-                window.location.href = 'products.php';
-            }
-        }
-
         // Product Details Modal
         const productDetailsModal = document.getElementById('productDetailsModal');
         if (productDetailsModal) {
             productDetailsModal.addEventListener('show.bs.modal', function(event) {
                 const button = event.relatedTarget;
                 const productData = JSON.parse(button.getAttribute('data-product'));
-                const productId = button.getAttribute('data-product-id') || productData.id;
                 const modalTitle = productDetailsModal.querySelector('.modal-title');
                 const modalBody = productDetailsModal.querySelector('#productDetailsContent');
 
@@ -695,60 +561,8 @@ if ($products_result) {
                             <p>${productData.description.replace(/\n/g, '<br>')}</p>
                         </div>
                     </div>
-                    <hr>
-                    <div class="mt-3">
-                        <h6 class="fw-bold">Customer Reviews</h6>
-                        <div id="productReviews_${productId}" class="reviews-container">
-                            <div class="text-center py-3">
-                                <div class="spinner-border spinner-border-sm" role="status">
-                                    <span class="visually-hidden">Loading...</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
                 `;
-                
-                // Load reviews
-                loadProductReviews(productId);
             });
-        }
-        
-        function loadProductReviews(productId) {
-            fetch(`get_reviews.php?product_id=${productId}`)
-                .then(response => response.json())
-                .then(data => {
-                    const reviewsContainer = document.getElementById(`productReviews_${productId}`);
-                    if (!reviewsContainer) return;
-                    
-                    if (data.success && data.reviews && data.reviews.length > 0) {
-                        let html = '';
-                        data.reviews.forEach(review => {
-                            const stars = '★'.repeat(review.rating) + '☆'.repeat(5 - review.rating);
-                            const date = new Date(review.created_at).toLocaleDateString();
-                            html += `
-                                <div class="review-item mb-3 p-3 border rounded">
-                                    <div class="d-flex justify-content-between align-items-start mb-2">
-                                        <div>
-                                            <strong>${review.first_name} ${review.last_name}</strong>
-                                            <div class="text-warning">${stars}</div>
-                                        </div>
-                                        <small class="text-muted">${date}</small>
-                                    </div>
-                                    ${review.review_text ? `<p class="mb-0">${review.review_text.replace(/\n/g, '<br>')}</p>` : ''}
-                                </div>
-                            `;
-                        });
-                        reviewsContainer.innerHTML = html;
-                    } else {
-                        reviewsContainer.innerHTML = '<p class="text-muted text-center">No reviews yet. Be the first to review this product!</p>';
-                    }
-                })
-                .catch(error => {
-                    const reviewsContainer = document.getElementById(`productReviews_${productId}`);
-                    if (reviewsContainer) {
-                        reviewsContainer.innerHTML = '<p class="text-danger">Error loading reviews.</p>';
-                    }
-                });
         }
     </script>
 </body>

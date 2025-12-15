@@ -21,7 +21,7 @@ $farmer_dashboard_path = $base_url . 'Pages/farmer/index.php';
 $admin_dashboard_path = $base_url . 'Pages/admin/index.php';
 $profile_path = $base_url . 'Pages/customer/profile.php';
 $edit_profile_path = $base_url . 'Pages/customer/edit-profile.php';
-$orders_path = $base_url . 'Pages/customer/orders.php';
+$orders_path = $base_url . 'Pages/customer/checkorders.php';
 $wishlist_path = $base_url . 'Pages/customer/wishlist.php';
 $setup_store_path = $base_url . 'Pages/customer/setUpStore.php';
 
