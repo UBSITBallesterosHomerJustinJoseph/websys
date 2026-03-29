@@ -63,18 +63,38 @@ if (isset($_POST['login'])) {
         $result = $farmcart->login($email, $password);
 
         if ($result['success']) {
-            // Login successful - redirect based on role
+            // Login successful - redirect based on role or return URL
             $role = $result['role'];
 
             // Store a login message
             $_SESSION['login_message'] = "Welcome back! You have successfully logged in.";
 
-            if ($role === 'admin') {
-                header("Location: ../Pages/admin/index.php");
-            } elseif ($role === 'farmer') {
-                header("Location: ../Pages/farmer/index.php");
+            // Check if there's a redirect parameter
+            if (isset($_GET['redirect']) && !empty($_GET['redirect'])) {
+                $redirect_url = urldecode($_GET['redirect']);
+                // Validate redirect URL to prevent open redirect vulnerabilities
+                // Only allow redirects within the same domain
+                if (strpos($redirect_url, '/websys/') === 0 || strpos($redirect_url, 'websys/') === 0) {
+                    header("Location: " . $redirect_url);
+                } else {
+                    // Invalid redirect, use default
+                    if ($role === 'admin') {
+                        header("Location: ../Pages/admin/index.php");
+                    } elseif ($role === 'farmer') {
+                        header("Location: ../Pages/farmer/index.php");
+                    } else {
+                        header("Location: ../Pages/customer/index.php");
+                    }
+                }
             } else {
-                header("Location: ../Pages/customer/index.php");
+                // Default redirect based on role
+                if ($role === 'admin') {
+                    header("Location: ../Pages/admin/index.php");
+                } elseif ($role === 'farmer') {
+                    header("Location: ../Pages/farmer/index.php");
+                } else {
+                    header("Location: ../Pages/customer/index.php");
+                }
             }
             exit();
         } else {

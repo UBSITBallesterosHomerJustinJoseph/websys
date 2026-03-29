@@ -1,11 +1,8 @@
 <?php
 include '../../db_connect.php';
 
-// Check if user is logged in
-if (!isset($_SESSION['user_id'])) {
-    header("location: ../index.php");
-    exit();
-}
+// Check if user is logged in (but don't require it for browsing)
+$is_logged_in = isset($_SESSION['user_id']) && !empty($_SESSION['user_id']);
 
 // Get category from URL
 $category_name = $_GET['category'] ?? '';
@@ -114,6 +111,8 @@ if ($products_result) {
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Remix Icon -->
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
     <!-- CSS -->
     <link rel="stylesheet" href="../../Assets/css/navbar.css">
     <link rel="stylesheet" href="../../Assets/css/customer.css">
@@ -169,6 +168,15 @@ if ($products_result) {
     <!-- Products Grid -->
     <section class="products-listing">
         <div class="container">
+            <?php if (!$is_logged_in): ?>
+                <div class="alert alert-info alert-dismissible fade show" role="alert" style="margin-bottom: 2rem; border-left: 4px solid #0F2E15;">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Browse freely!</strong> You can view all products, but you'll need to 
+                    <a href="/websys/Register/login.php?redirect=<?php echo urlencode($_SERVER['REQUEST_URI']); ?>" class="alert-link fw-bold">log in</a> 
+                    to add items to your cart and make purchases.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            <?php endif; ?>
             <!-- Filters and Sorting -->
             <div class="products-header">
                 <div class="row align-items-center">
@@ -399,6 +407,41 @@ if ($products_result) {
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
+        // Quantity selector functionality
+        document.querySelectorAll('.quantity-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                const input = this.parentElement.querySelector('.quantity-input');
+                let value = parseInt(input.value);
+
+                if (this.classList.contains('plus')) {
+                    input.value = value + 1;
+                } else if (this.classList.contains('minus') && value > 1) {
+                    input.value = value - 1;
+                }
+            });
+        });
+
+        // Add to cart functionality
+        document.querySelectorAll('.btn-add-to-cart').forEach(button => {
+            button.addEventListener('click', function() {
+                const productId = this.getAttribute('data-product-id');
+                const quantity = this.parentElement.querySelector('.quantity-input').value;
+
+                // Show success message
+                const originalText = this.innerHTML;
+                this.innerHTML = '<i class="fas fa-check"></i> Added!';
+                this.disabled = true;
+
+                setTimeout(() => {
+                    this.innerHTML = originalText;
+                    this.disabled = false;
+                }, 2000);
+
+                // Here you would typically send an AJAX request to add to cart
+                console.log(`Added product ${productId} with quantity ${quantity} to cart`);
+            });
+        });
+
         // View Image Function
         function viewImage(imageUrl, productName) {
             document.getElementById('modalImage').src = imageUrl;

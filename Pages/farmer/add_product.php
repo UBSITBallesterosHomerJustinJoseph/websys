@@ -81,7 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_product'])) {
         $stmt = $farmcart->conn->prepare($sql);
 
         if ($stmt) {
-            $stmt->bind_param("ssisdiisi", $product_name, $description, $category_id, $unit_type, $base_price, $initial_quantity, $farmer_id, $expiration_duration_seconds);
+            $stmt->bind_param("ssisdiii", $product_name, $description, $category_id, $unit_type, $base_price, $initial_quantity, $farmer_id, $expiration_duration_seconds);
 
             if ($stmt->execute()) {
                 $product_id = $stmt->insert_id;

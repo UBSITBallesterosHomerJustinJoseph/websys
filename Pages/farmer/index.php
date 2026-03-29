@@ -502,6 +502,51 @@ if (isset($_GET['success'])) {
               <?php endif; ?>
             </div>
 
+            <!-- Recent Reviews -->
+            <?php
+            $reviews = $farmcart->getFarmerReviews($farmer_id, 5);
+            ?>
+            <div class="form-card p-4 mb-4">
+              <h5 class="text-success mb-3">
+                <i class="fas fa-star me-2"></i>Recent Reviews
+              </h5>
+              
+              <?php if (!empty($reviews)): ?>
+                <div class="list-group list-group-flush">
+                  <?php foreach ($reviews as $review): ?>
+                    <div class="list-group-item px-0">
+                      <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div class="flex-grow-1">
+                          <h6 class="mb-1"><?= htmlspecialchars($review['product_name']); ?></h6>
+                          <div class="text-warning mb-1">
+                            <?php for ($i = 1; $i <= 5; $i++): ?>
+                              <i class="fas fa-star<?= $i <= $review['rating'] ? '' : '-o' ?>"></i>
+                            <?php endfor; ?>
+                          </div>
+                          <?php if (!empty($review['review_text'])): ?>
+                            <p class="mb-1 small"><?= htmlspecialchars(substr($review['review_text'], 0, 100)); ?><?= strlen($review['review_text']) > 100 ? '...' : ''; ?></p>
+                          <?php endif; ?>
+                          <small class="text-muted">
+                            by <?= htmlspecialchars($review['first_name'] . ' ' . $review['last_name']); ?> • 
+                            <?= date('M d, Y', strtotime($review['created_at'])); ?>
+                          </small>
+                        </div>
+                      </div>
+                    </div>
+                  <?php endforeach; ?>
+                </div>
+                <a href="reviews.php" class="btn btn-outline-success btn-sm mt-3 w-100">
+                  <i class="fas fa-list me-1"></i>View All Reviews
+                </a>
+              <?php else: ?>
+                <div class="text-center py-3">
+                  <i class="fas fa-star fa-2x text-muted mb-2"></i>
+                  <p class="text-muted mb-0">No reviews yet</p>
+                  <small class="text-muted">Reviews will appear here once customers rate your products</small>
+                </div>
+              <?php endif; ?>
+            </div>
+
             <!-- Quick Actions -->
             <div class="form-card p-4">
               <h5 class="text-success mb-3">

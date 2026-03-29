@@ -1,201 +1,144 @@
 <?php
-// farmer/profile.php
+session_start();
 include '../../db_connect.php';
+require_once 'User.php';
 
-// Check if user is logged in and is a farmer
-if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'farmer') {
-    header("location: ../customer/index.php");
+// Guard: must be logged in
+if (!isset($_SESSION['user_id'])) {
+    header("Location: ../../index.php");
     exit();
 }
 
-$farmer_id = $_SESSION['user_id'];
-$farmer_profile = $farmcart->get_farmer_profile($farmer_id);
-
-// Calculate total products count for sidebar
-$count_query = "SELECT COUNT(*) as total FROM products WHERE created_by = ?";
-$count_stmt = $farmcart->conn->prepare($count_query);
-if ($count_stmt) {
-    $count_stmt->bind_param("i", $farmer_id);
-    $count_stmt->execute();
-    $count_result = $count_stmt->get_result();
-    $total_products_count = $count_result->fetch_assoc()['total'] ?? 0;
-    $count_stmt->close();
-} else {
-    $total_products_count = 0;
-}
-
-// Handle profile update
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
-    $farm_name = $farmcart->conn->real_escape_string($_POST['farm_name']);
-    $farm_location = $farmcart->conn->real_escape_string($_POST['farm_location']);
-    $farm_size = (int)$_POST['farm_size'];
-    $farming_method = $farmcart->conn->real_escape_string($_POST['farming_method']);
-    $years_experience = (int)$_POST['years_experience'];
-    $certification_details = $farmcart->conn->real_escape_string($_POST['certification_details']);
-    $bio = $farmcart->conn->real_escape_string($_POST['bio']);
-
-    if ($farmer_profile) {
-        // Update existing profile
-        $sql = "UPDATE farmer_profiles SET 
-                farm_name = ?, farm_location = ?, farm_size = ?, farming_method = ?, 
-                years_experience = ?, certification_details = ?, bio = ?, updated_at = NOW()
-                WHERE user_id = ?";
-        $stmt = $farmcart->conn->prepare($sql);
-        $stmt->bind_param("ssisisii", $farm_name, $farm_location, $farm_size, $farming_method, 
-                         $years_experience, $certification_details, $bio, $farmer_id);
-    } else {
-        // Create new profile
-        $sql = "INSERT INTO farmer_profiles 
-                (user_id, farm_name, farm_location, farm_size, farming_method, years_experience, 
-                 certification_details, bio, is_verified_farmer, created_at, updated_at) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, NOW(), NOW())";
-        $stmt = $farmcart->conn->prepare($sql);
-        $stmt->bind_param("issisisis", $farmer_id, $farm_name, $farm_location, $farm_size, 
-                         $farming_method, $years_experience, $certification_details, $bio);
-    }
-
-    if ($stmt->execute()) {
-        $success = "Profile updated successfully!";
-        $farmer_profile = $farmcart->get_farmer_profile($farmer_id); // Refresh profile data
-    } else {
-        $error = "Failed to update profile: " . $stmt->error;
-    }
-    $stmt->close();
-}
-
-// Set sidebar stats before including sidebar
-$sidebar_stats = [
-    'total_products' => $total_products_count,
-    'pending_orders' => 0,
-    'low_stock' => 0
-];
+$userObj = new User($conn);
+$userId  = $_SESSION['user_id'];
+$user    = $userObj->getById($userId); // Ensure this joins farmer_profiles table
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <title>Edit Profile | FarmCart</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <meta charset="UTF-8">
+  <title>Customer Profile | FarmCart</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Bootstrap -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Font Awesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <!-- FarmCart Styles -->
+  <link rel="stylesheet" href="../../Assets/css/navbar.css">
+
   <style>
-    body { background-color: #f8f9fa; margin: 0; padding: 0; overflow-x: hidden; }
-    .dashboard-container { display: flex; min-height: 100vh; }
-    .sidebar-column { width: 280px; min-width: 280px; background: linear-gradient(180deg, #4E653D 0%, #3a5230 100%); position: fixed; left: 0; top: 0; height: 100vh; overflow-y: auto; z-index: 1000; box-shadow: 2px 0 10px rgba(0,0,0,0.1); }
-    .main-content-column { flex: 1; margin-left: 280px; min-height: 100vh; padding: 0; }
-    .content-area { padding: 30px; min-height: 100vh; background: #f8f9fa; }
-    .form-card { background: white; border-radius: 15px; box-shadow: 0 5px 25px rgba(0,0,0,0.08); border: none; }
+    body { background-color: var(--light-bg); font-family: 'Inter', sans-serif; }
+    .profile-header {
+      background: linear-gradient(135deg, var(--primary-green), var(--dark-green));
+      color: var(--white);
+      padding: 5rem 0;
+      text-align: center;
+      border-bottom: 4px solid var(--accent-gold);
+    }
+    .profile-header h1 { font-weight: 800; font-size: 3rem; margin-bottom: 0.5rem; }
+    .profile-header p { color: rgba(255,255,255,0.85); font-size: 1.2rem; }
+    .accent-line { width: 100px; height: 4px; background: var(--accent-gold); margin: 1rem auto; border-radius: 2px; }
+    .profile-card { border-radius: 16px; border: none; box-shadow: 0 8px 25px rgba(0,0,0,0.1); }
+    .profile-icon { font-size: 4rem; color: var(--accent-gold); }
+    .btn-edit {
+      background: linear-gradient(135deg, var(--accent-gold), #E8C547);
+      color: var(--dark-green); font-weight: 600; border-radius: 10px; border: none;
+    }
+    .btn-edit:hover { background: linear-gradient(135deg, #c19b2a, #d4b342); }
   </style>
 </head>
 <body>
-  <div class="dashboard-container">
-    <div class="sidebar-column"><?php include '../../Includes/sidebar.php'; ?></div>
-    <div class="main-content-column">
-      <div class="content-area">
-        <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-4 mb-4 border-bottom">
-          <div>
-            <h1 class="h2 text-success fw-bold"><i class="fas fa-user-edit me-2"></i>Edit Profile</h1>
-            <p class="text-muted mb-0">Update your farm information and profile details.</p>
-          </div>
-        </div>
 
-        <?php if (!empty($error)): ?>
-          <div class="alert alert-danger alert-dismissible fade show">
-            <i class="fas fa-exclamation-triangle me-2"></i><?= htmlspecialchars($error) ?>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-          </div>
-        <?php endif; ?>
-        
-        <?php if (!empty($success)): ?>
-          <div class="alert alert-success alert-dismissible fade show">
-            <i class="fas fa-check-circle me-2"></i><?= htmlspecialchars($success) ?>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-          </div>
-        <?php endif; ?>
+  <!-- Navbar -->
+  <?php include '../../Includes/navbar.php'; ?>
 
-        <div class="form-card p-4">
-          <form method="post">
-            <div class="row g-4">
-              <div class="col-md-6">
-                <h5 class="text-success mb-4"><i class="fas fa-tractor me-2"></i>Farm Information</h5>
-                
-                <div class="mb-3">
-                  <label class="form-label fw-semibold">Farm Name *</label>
-                  <input type="text" name="farm_name" class="form-control" 
-                         value="<?= htmlspecialchars($farmer_profile['farm_name'] ?? '') ?>" 
-                         placeholder="Enter your farm name" required>
-                </div>
+  <!-- Header -->
+  <section class="profile-header">
+    <div class="container">
+      <h1><i class="fas fa-user-circle me-2 text-accent"></i> My Profile</h1>
+      <p>View and manage your account details</p>
+      <div class="accent-line"></div>
+    </div>
+  </section>
 
-                <div class="mb-3">
-                  <label class="form-label fw-semibold">Farm Location *</label>
-                  <input type="text" name="farm_location" class="form-control" 
-                         value="<?= htmlspecialchars($farmer_profile['farm_location'] ?? '') ?>" 
-                         placeholder="Enter farm location" required>
-                </div>
-
-                <div class="mb-3">
-                  <label class="form-label fw-semibold">Farm Size (hectares) *</label>
-                  <input type="number" name="farm_size" class="form-control" 
-                         value="<?= $farmer_profile['farm_size'] ?? '' ?>" 
-                         placeholder="Enter farm size in hectares" step="0.1" min="0" required>
-                </div>
-
-                <div class="mb-3">
-                  <label class="form-label fw-semibold">Farming Method</label>
-                  <select name="farming_method" class="form-control">
-                    <option value="">Select Farming Method</option>
-                    <option value="Organic" <?= ($farmer_profile['farming_method'] ?? '') == 'Organic' ? 'selected' : '' ?>>Organic</option>
-                    <option value="Conventional" <?= ($farmer_profile['farming_method'] ?? '') == 'Conventional' ? 'selected' : '' ?>>Conventional</option>
-                    <option value="Hydroponic" <?= ($farmer_profile['farming_method'] ?? '') == 'Hydroponic' ? 'selected' : '' ?>>Hydroponic</option>
-                    <option value="Aquaponic" <?= ($farmer_profile['farming_method'] ?? '') == 'Aquaponic' ? 'selected' : '' ?>>Aquaponic</option>
-                    <option value="Permaculture" <?= ($farmer_profile['farming_method'] ?? '') == 'Permaculture' ? 'selected' : '' ?>>Permaculture</option>
-                  </select>
-                </div>
-              </div>
-
-              <div class="col-md-6">
-                <h5 class="text-success mb-4"><i class="fas fa-user me-2"></i>Farmer Details</h5>
-
-                <div class="mb-3">
-                  <label class="form-label fw-semibold">Years of Experience *</label>
-                  <input type="number" name="years_experience" class="form-control" 
-                         value="<?= $farmer_profile['years_experience'] ?? '' ?>" 
-                         placeholder="Enter years of farming experience" min="0" required>
-                </div>
-
-                <div class="mb-3">
-                  <label class="form-label fw-semibold">Certifications</label>
-                  <textarea name="certification_details" class="form-control" rows="3" 
-                            placeholder="List any farming certifications or awards..."><?= htmlspecialchars($farmer_profile['certification_details'] ?? '') ?></textarea>
-                </div>
-
-                <div class="mb-3">
-                  <label class="form-label fw-semibold">Bio/Description</label>
-                  <textarea name="bio" class="form-control" rows="4" 
-                            placeholder="Tell customers about your farm and farming practices..."><?= htmlspecialchars($farmer_profile['bio'] ?? '') ?></textarea>
-                </div>
-              </div>
-            </div>
-
-            <div class="row mt-4">
-              <div class="col-12">
-                <div class="d-flex gap-3">
-                  <button type="submit" name="update_profile" class="btn btn-success btn-lg px-5">
-                    <i class="fas fa-save me-2"></i>
-                    Update Profile
-                  </button>
-                  <a href="index.php" class="btn btn-outline-secondary btn-lg">
-                    <i class="fas fa-times me-2"></i>
-                    Cancel
-                  </a>
-                </div>
-              </div>
-            </div>
-          </form>
-        </div>
+  <!-- Profile Card -->
+  <div class="container py-5">
+  <div class="card profile-card p-4">
+    <div class="row align-items-center">
+      <div class="col-md-3 text-center">
+        <i class="fas fa-user-circle profile-icon"></i>
+      </div>
+      <div class="col-md-9 profile-info">
+        <h5><?php echo htmlspecialchars($user['first_name'] . ' ' . $user['last_name']); ?></h5>
+        <p><i class="fas fa-envelope me-2 text-success"></i><?php echo htmlspecialchars($user['email']); ?></p>
+        <p><i class="fas fa-phone me-2 text-success"></i><?php echo htmlspecialchars($user['phone_number']); ?></p>
+        <p><i class="fas fa-map-marker-alt me-2 text-success"></i><?php echo htmlspecialchars($user['address']); ?></p>
       </div>
     </div>
+
+    <hr>
+
+    <!-- Farm Info -->
+    <h6 class="fw-bold text-dark-green">
+      <i class="fas fa-seedling me-2 text-accent"></i> Farm Information
+    </h6>
+
+    <?php if (!empty($user['farm_name'])): ?>
+      <div class="card mt-3 border-0 shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title text-success d-flex align-items-center">
+            <i class="fas fa-leaf me-2"></i><?php echo htmlspecialchars($user['farm_name']); ?>
+
+            <?php if (!empty($user['is_verified_farmer']) && $user['is_verified_farmer']): ?>
+              <span class="badge bg-success ms-2">
+                <i class="fas fa-check"></i> Verified Farmer
+              </span>
+            <?php endif; ?>
+          </h5>
+
+          <ul class="list-unstyled mb-3">
+            <li><i class="fas fa-map-marker-alt me-2 text-success"></i><?php echo htmlspecialchars($user['farm_location']); ?></li>
+            <li><i class="fas fa-ruler-combined me-2 text-success"></i><?php echo htmlspecialchars($user['farm_size']); ?> hectares</li>
+            <li><i class="fas fa-seedling me-2 text-success"></i><?php echo htmlspecialchars($user['farming_method']); ?></li>
+            <li><i class="fas fa-calendar-alt me-2 text-success"></i><?php echo htmlspecialchars($user['years_experience']); ?> years experience</li>
+            <li><i class="fas fa-certificate me-2 text-success"></i><?php echo htmlspecialchars($user['certification_details']); ?></li>
+            <li><i class="fas fa-info-circle me-2 text-success"></i><?php echo htmlspecialchars($user['bio']); ?></li>
+          </ul>
+
+          <small class="text-muted">Created: 
+            <?php echo htmlspecialchars($user['created_at']); ?> | Updated: 
+            <?php echo htmlspecialchars($user['updated_at']); ?>
+          </small>
+
+          <div class="d-flex gap-2 mt-3">
+            <a href="edit-profile.php" class="btn btn-success btn-sm">
+              <i class="fas fa-user-edit me-1"></i> Edit Profile
+            </a>
+
+  
+
+            <a href="../../Pages/farmer/index.php" class="btn btn-success btn-sm">
+              <i class="fas fa-chart-line me-1"></i> Dashboard
+            </a>
+          </div>
+
+        </div>
+      </div>
+
+    <?php else: ?>
+      <p class="text-muted">
+        You don’t have a farm profile yet. 
+        <a href="setUpStore.php" class="text-success fw-bold">Setup your farm</a>.
+      </p>
+    <?php endif; ?>
+
   </div>
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</div>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

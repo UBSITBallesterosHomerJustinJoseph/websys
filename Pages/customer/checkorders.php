@@ -5,6 +5,12 @@ include '../../db_connect.php';
 $userId = $_SESSION['user_id'] ?? null;
 $orders = [];
 
+// Guard: require login
+if (!$userId) {
+    header("Location: ../../Register/login.php?redirect=" . urlencode($_SERVER['REQUEST_URI']));
+    exit();
+}
+
 if ($userId) {
     $sql = "
         SELECT order_id, status, created_at, total_amount, payment_method, payment_status, shipping_address, order_notes
@@ -28,8 +34,8 @@ if ($userId) {
                    p.product_name, p.unit_type,
                    il.lot_number
             FROM order_items oi
-            JOIN inventory_lots il ON oi.lot_id = il.lot_id
-            JOIN products p ON il.product_id = p.product_id
+            LEFT JOIN inventory_lots il ON oi.lot_id = il.lot_id
+            LEFT JOIN products p ON il.product_id = p.product_id
             WHERE oi.order_id = ?
         ";
         $itemsStmt = $farmcart->conn->prepare($itemsSql);
